@@ -147,6 +147,11 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToRecoveryCodes = {
                                     navController.navigate(Screen.RecoveryCodes.route)
                                 },
+                                onGenerateNewCodes = {
+                                    // Regenerate a fresh batch, then open the reveal screen to show them once.
+                                    recoveryViewModel.generateNewCodes()
+                                    navController.navigate(Screen.RecoveryCodes.route)
+                                },
                                 onSimulateLockOverlay = {
                                     navController.navigate(Screen.LockOverlay.route)
                                 }

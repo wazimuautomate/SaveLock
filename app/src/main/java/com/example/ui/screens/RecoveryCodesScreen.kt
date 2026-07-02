@@ -49,6 +49,11 @@ fun RecoveryCodesScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // First-time users get a fresh batch generated + shown here (once). Leaving the screen hides the
+    // plaintext again — from then on only masked codes + used/unused status are visible.
+    LaunchedEffect(Unit) { viewModel.ensureCodesExist() }
+    DisposableEffect(Unit) { onDispose { viewModel.clearRevealed() } }
+
     fun copyToClipboard(code: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("SaveLock Recovery Code", code)

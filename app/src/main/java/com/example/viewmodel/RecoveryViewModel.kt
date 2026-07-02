@@ -44,9 +44,16 @@ class RecoveryViewModel(private val repository: SaveLockRepository) : ViewModel(
     val revealedCodes: StateFlow<List<String>?> = _revealedCodes.asStateFlow()
 
     val uiState: StateFlow<RecoveryUiState> =
-        combine(repository.recoveryCodes, entry) { stored, e ->
+        combine(repository.recoveryCodes, entry, _revealedCodes) { stored, e, revealed ->
+            // Right after generation we show the REAL plaintext codes (all unused) so the user can
+            // write them down; at all other times we show only masked, tick used/unused status.
+            val codes = if (revealed != null) {
+                revealed.map { RecoveryCode(code = it, isUsed = false) }
+            } else {
+                stored.map { RecoveryCode(code = it.maskedDisplay, isUsed = it.used) }
+            }
             RecoveryUiState(
-                codes = stored.map { RecoveryCode(it.maskedDisplay, it.used) },
+                codes = codes,
                 enteredCode = e.enteredCode,
                 codeValidationError = e.error,
                 codeValidationSuccess = e.success

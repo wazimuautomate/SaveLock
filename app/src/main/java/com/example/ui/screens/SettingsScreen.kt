@@ -37,6 +37,7 @@ import com.example.viewmodel.ThemeMode
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onNavigateToRecoveryCodes: () -> Unit,
+    onGenerateNewCodes: () -> Unit,
     onSimulateLockOverlay: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -740,7 +741,10 @@ fun SettingsScreen(
                 },
                 confirmButton = {
                     Button(
-                        onClick = { viewModel.generateNewRecoveryCodes() },
+                        onClick = {
+                            viewModel.generateNewRecoveryCodes()   // dismiss the warning dialog
+                            onGenerateNewCodes()                    // regenerate + open the reveal screen
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = SaveLockRed)
                     ) {
                         Text("Regenerate")

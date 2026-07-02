@@ -44,9 +44,12 @@ class HistoryViewModel(private val repository: SaveLockRepository) : ViewModel()
                         if (l.targetAmount <= 0) 0f
                         else (l.savedAmount.toFloat() / l.targetAmount).coerceIn(0f, 1f)
                     }
-                HistoryUiState(historyItems = items, trendData = trend)
+                // The chart divides by (points - 1), so it needs at least 2 points. Pad safely.
+                val safeTrend = if (trend.size >= 2) trend else List(2) { trend.firstOrNull() ?: 0f }
+                HistoryUiState(historyItems = items, trendData = safeTrend)
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+            // Initial value also needs >= 2 trend points so the chart never divides by zero.
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState(trendData = listOf(0f, 0f)))
 
     private fun SavingsLogEntity.toHistoryItem(): HistoryItem = HistoryItem(
         date = DateUtils.isoToDisplay(date),
