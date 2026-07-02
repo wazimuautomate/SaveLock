@@ -29,3 +29,6 @@ backend/.env
 node_modules/
 .vercel
 .supabase
+
+# Stray tool log
+firebase-debug.log
