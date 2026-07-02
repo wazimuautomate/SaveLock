@@ -49,16 +49,20 @@ No sideloaded app can be made truly unremovable without wiping the phone.
 
 ---
 
-## Building the APK (the installable app file)
+## Getting the APK (the installable app file) — no Android Studio needed
 
-Android apps are normally built in **Android Studio**. If your PC can't run it, the plan is to set up
-a **free GitHub Actions cloud build** so every push to the `feature` branch automatically produces an
-installable `app-debug.apk` you can download and sideload — no Android Studio needed. (Ask and I'll add this.)
+Every push to the `feature` branch triggers a **free GitHub Actions cloud build** that compiles the app
+and produces an installable `app-debug.apk`. To download it onto your phone:
 
-If you *do* have Android Studio:
-1. Open the project folder in Android Studio and let it sync.
-2. Create a `.env` if needed (no Gemini key is required anymore — that template code was removed).
-3. Build ▸ Build APK, then copy the APK to your phone and install it.
+1. Open your repo on GitHub → click the **Actions** tab.
+2. Click the most recent green ✓ **Android Build** run.
+3. Scroll down to **Artifacts** → download **savelock-debug-apk** (it's a `.zip`).
+4. Unzip it to get `app-debug.apk`, copy it to your phone, tap it, and allow "install from unknown sources".
+
+That's it — no Android Studio, no developer mode, no cable required.
+
+> If you later get Android Studio: open the folder, let it sync, then Build ▸ Build APK. No Gemini key
+> is needed (that template code was removed).
 
 ---
 

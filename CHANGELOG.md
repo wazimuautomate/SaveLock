@@ -12,6 +12,17 @@ This project uses date-based entries (personal, non-versioned build).
 - Git repository initialized with `main` + `feature` branches and the GitHub remote
   `wazimuautomate/SaveLock`. Hardened `.gitignore` so secrets/keystores/backend env files
   are never committed.
+- **Room data layer**: `SavingsConfig`, `SavingsLog`, `RecoveryCode` entities + DAOs + database;
+  `SaveLockRepository` exposing Flows; offline `RecoveryCodeManager` (salted PBKDF2 hashing).
+- **All 5 ViewModels migrated** to real repository data (UI contracts unchanged). Settings now
+  persists to Room. Added a **Lock Strictness** selector (Chosen apps / Full lockdown).
+- **Two lock modes** (`LockMode`): `CHOSEN_APPS` and `FULL_LOCKDOWN` (blocks all but calls/messages).
+- **GitHub Actions cloud build** producing a downloadable debug APK on every push (Gradle 9.3.1).
+- Env templates: `backend/.env.example` and `app/savelock.properties.example` (→ `BuildConfig`).
+
+### Changed
+- Removed unused Firebase / Gemini / App-Check / secrets-gradle code (lighter app); added WorkManager.
+- Debug builds now use the default auto-generated keystore (so any machine/CI can build).
 
 ### Planned (next)
 - Room data layer (SavingsConfig, SavingsLog, RecoveryCode) + repository exposing Flows.

@@ -78,13 +78,23 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 - `repository.todayLog`/`totalSaved` compute "today" once at repo-singleton creation. Fine for daily
   restarts; revisit if we need live midnight rollover.
 
-**Next up**
-- 🔄 Set up GitHub Actions cloud build (compile check + downloadable APK). No gradle wrapper exists;
-  toolchain is AGP 9.1.1 / compileSdk 36.1 (AI Studio). Iterate via `gh run` logs.
-- ⏳ Recovery wiring (read RecoveryCodesScreen + HistoryScreen first), scheduling, services,
-  accessibility/overlay, device-admin, payment, backend.
+**✅ CI IS GREEN (build succeeds, APK produced)** — commit cc47377, run 28627754372.
+- Working toolchain for CI: **JDK 21 + Gradle 9.3.1** (AGP 9.1.1 requires ≥9.3.1). Workflow
+  `.github/workflows/android-build.yml` generates the wrapper (repo has none) then `assembleDebug`.
+- Fixes that made it build: (1) Gradle 9.3.1, (2) removed custom `debugConfig` signing → debug uses
+  AGP default keystore, (3) `fallbackToDestructiveMigration(dropAllTables = true)`.
+- The KSP `AWT-EventQueue-0 NullPointerException` in logs is a NON-FATAL KSP2 shutdown quirk; ignore.
+- ALL Kotlin compiled clean (data layer + VMs + screens). APK downloadable from GitHub → Actions →
+  run → Artifacts → `savelock-debug-apk`.
+
+**Next up (core engine — none built yet)**
+- ⏳ Recovery wiring (read RecoveryCodesScreen + HistoryScreen first — still not read).
+- ⏳ Scheduling (AlarmScheduler/LockCheckReceiver/BootReceiver/ReminderWorker), foreground service,
+  accessibility soft-lock + LockOverlayActivity (two modes), device-admin, payment, Supabase backend,
+  manifest permissions/registrations.
 - ⚠️ Will need Supabase project URL + APP_BACKEND_KEY at payment stage; Daraja creds go only into
   Supabase env vars.
+- After each new native piece, keep pushing so CI compile-checks it.
 
 **Open questions / watch-outs**
 - Need owner's Supabase project details (URL + anon key) before the app can call the backend —
