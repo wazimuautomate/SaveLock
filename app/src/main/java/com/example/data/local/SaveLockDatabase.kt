@@ -41,7 +41,7 @@ abstract class SaveLockDatabase : RoomDatabase() {
                 )
                     // Personal app, single user: a destructive fallback is acceptable if we ever
                     // bump the schema version without writing a migration.
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
             }
