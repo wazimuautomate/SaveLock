@@ -45,10 +45,30 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 - Phone number format enforced by UI regex: `^2547\d{8}$`.
 - Recovery code display format: `XXXX-XXXX` (UI shows `SLxx-xxxx` style).
 
-**Next up (start of Session 2)**
-- ⏳ Update `build.gradle.kts` + `libs.versions.toml` (remove Firebase/Gemini, add WorkManager + security-crypto).
-- ⏳ Build the Room data layer (entities, DAOs, database, repository).
+**Progress later on 2026-07-03**
+- ✅ Gradle slimmed: removed Firebase/Gemini/App-Check/secrets & google-services plugins; added
+  WorkManager (`androidx.work:work-runtime-ktx` 2.9.1). Decided to SKIP security-crypto (per-code
+  PBKDF2 salt is enough — keeps it light).
+- ✅ Room data layer built & committed (74b5f0c):
+  - Entities: `SavingsConfigEntity` (single row id=0, holds distractionApps as JSON via Moshi),
+    `SavingsLogEntity` (PK = date "yyyy-MM-dd", status enum), `RecoveryCodeEntity` (hash+salt+masked).
+  - `Converters` (CSV for List<Int>, Moshi for apps, enum-by-name), 3 DAOs, `SaveLockDatabase`.
+  - `SaveLockRepository` exposes Flows: config, logs, todayLog, totalSaved, streak, recoveryCodes;
+    suspend writers for every config field + markSavedToday/markRecoveryUsedToday/markMissed +
+    redeemRecoveryCode (offline).
+  - `RecoveryCodeManager` (offline PBKDF2WithHmacSHA256, 120k iters, unambiguous alphabet, XXXX-XXXX).
+  - `ServiceLocator` (manual DI) + `SaveLockApplication` (registered in manifest android:name) seeds
+    config + inits notification channels at startup.
+- Decision: recovery codes are NOT auto-generated at startup (user must see them once) — generation
+  handled at the Recovery screen / Settings action in the next step.
+
+**Next up**
+- ⏳ Migrate the 5 ViewModels + MainActivity to consume the repository via ViewModel factories
+  (keep the exact UiState contracts). Read `RecoveryCodesScreen.kt` first (not yet read).
+- ⏳ Then scheduling, services, accessibility/overlay, device-admin, payment, backend.
 - ⚠️ Owner to run `gh auth login` so I can push `feature` to GitHub.
+- ⚠️ Will need: Supabase project URL + anon key (for the app) at payment stage; Daraja creds go only
+  into Supabase env vars (never in the app).
 
 **Open questions / watch-outs**
 - Need owner's Supabase project details (URL + anon key) before the app can call the backend —

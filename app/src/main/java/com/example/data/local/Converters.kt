@@ -2,6 +2,7 @@ package com.example.data.local
 
 import androidx.room.TypeConverter
 import com.example.data.local.entity.DistractionAppRecord
+import com.example.data.local.entity.LockMode
 import com.example.data.local.entity.SavingsStatus
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
@@ -26,6 +27,13 @@ class Converters {
     @TypeConverter
     fun toStatus(value: String): SavingsStatus =
         runCatching { SavingsStatus.valueOf(value) }.getOrDefault(SavingsStatus.PENDING)
+
+    @TypeConverter
+    fun fromLockMode(mode: LockMode): String = mode.name
+
+    @TypeConverter
+    fun toLockMode(value: String): LockMode =
+        runCatching { LockMode.valueOf(value) }.getOrDefault(LockMode.CHOSEN_APPS)
 
     @TypeConverter
     fun fromDistractionApps(list: List<DistractionAppRecord>?): String =

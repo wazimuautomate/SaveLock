@@ -1,0 +1,14 @@
+# ============================================================================
+#  SaveLock APP config (safe-ish values that go INTO the installed app)
+#  Copy this file to `app/savelock.properties` and paste your real values there.
+#  The real file is git-ignored so it is never uploaded to GitHub.
+#  NOTE: real Daraja/Supabase SECRET keys must NEVER go in here — only on the
+#  server (see backend/.env). This file holds only the backend address + shared password.
+# ============================================================================
+
+# The base web address of your deployed Supabase Edge Functions.
+# Looks like: https://YOUR-PROJECT-REF.functions.supabase.co
+SUPABASE_FUNCTIONS_URL=https://YOUR-PROJECT-REF.functions.supabase.co
+
+# The SAME long random string you put in backend/.env (APP_BACKEND_KEY).
+APP_BACKEND_KEY=paste-the-same-long-random-string-here

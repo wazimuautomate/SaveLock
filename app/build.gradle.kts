@@ -1,9 +1,24 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
 }
+
+// Load app config (backend URL + shared key) from app/savelock.properties if present,
+// otherwise fall back to the committed .example so the build never breaks. Real secret
+// keys (Daraja/Supabase) never live here — only on the server.
+val savelockProps = Properties().apply {
+  val real = rootProject.file("app/savelock.properties")
+  val example = rootProject.file("app/savelock.properties.example")
+  val source = if (real.exists()) real else example
+  if (source.exists()) FileInputStream(source).use { load(it) }
+}
+fun savelockProp(key: String, default: String = ""): String =
+  savelockProps.getProperty(key)?.takeIf { it.isNotBlank() } ?: default
 
 android {
   namespace = "com.example"
@@ -17,6 +32,10 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Injected from app/savelock.properties (see top of file). Read in code via BuildConfig.
+    buildConfigField("String", "SUPABASE_FUNCTIONS_URL", "\"${savelockProp("SUPABASE_FUNCTIONS_URL")}\"")
+    buildConfigField("String", "APP_BACKEND_KEY", "\"${savelockProp("APP_BACKEND_KEY")}\"")
   }
 
   signingConfigs {

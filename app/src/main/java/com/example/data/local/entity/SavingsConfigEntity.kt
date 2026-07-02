@@ -20,6 +20,8 @@ data class SavingsConfigEntity(
     val mpesaNumber: String = "",
     /** Master switch: when false, no locks/reminders fire. */
     val savingEnabled: Boolean = true,
+    /** How strict the lock is once the deadline passes. Defaults to the gentler chosen-apps mode. */
+    val lockMode: LockMode = LockMode.CHOSEN_APPS,
     /** Candidate distraction apps with their restricted flags. */
     val distractionApps: List<DistractionAppRecord> = defaultDistractionApps()
 ) {

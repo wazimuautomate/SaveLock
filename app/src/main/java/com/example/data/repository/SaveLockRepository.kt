@@ -46,6 +46,8 @@ class SaveLockRepository(
 
     suspend fun setDailyAmount(amount: Int) = updateConfig { it.copy(dailyAmount = amount) }
     suspend fun setLockTime(time: String) = updateConfig { it.copy(lockTime = time) }
+    suspend fun setLockMode(mode: com.example.data.local.entity.LockMode) =
+        updateConfig { it.copy(lockMode = mode) }
     suspend fun setMpesaNumber(number: String) = updateConfig { it.copy(mpesaNumber = number) }
     suspend fun setSavingEnabled(enabled: Boolean) = updateConfig { it.copy(savingEnabled = enabled) }
 

@@ -24,6 +24,7 @@ debug.keystore
 google-services.json
 supabase/.env
 backend/.env
+app/savelock.properties
 
 # Backend / Node
 node_modules/
