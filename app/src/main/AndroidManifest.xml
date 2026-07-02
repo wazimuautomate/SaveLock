@@ -5,6 +5,18 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Re-arm the daily lock after a reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Exact daily lock alarm. USE_EXACT_ALARM auto-grants on 33+; SCHEDULE_EXACT_ALARM covers
+         31/32 (user-grantable). Code falls back to inexact if neither is available. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Supervising foreground service (special-use: a personal savings-discipline lock) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:name=".SaveLockApplication"
         android:allowBackup="true"
@@ -26,6 +38,32 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Supervising foreground service (resilience anchor for the lock) -->
+        <service
+            android:name=".service.SaveLockForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Personal savings-discipline app lock supervised for the current day" />
+        </service>
+
+        <!-- Fires at the daily lock time (triggered by our own exact alarm) -->
+        <receiver
+            android:name=".scheduling.LockCheckReceiver"
+            android:exported="false" />
+
+        <!-- Re-arms alarms and the lock after reboot -->
+        <receiver
+            android:name=".scheduling.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

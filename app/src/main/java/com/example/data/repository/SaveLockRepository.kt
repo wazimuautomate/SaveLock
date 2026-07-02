@@ -136,6 +136,27 @@ class SaveLockRepository(
         return log.status == SavingsStatus.SAVED || log.status == SavingsStatus.RECOVERY_USED
     }
 
+    /** Ensure today has a row (PENDING) so it shows in history and the lock check has a target. */
+    suspend fun ensureTodayPending() {
+        if (getTodayLog() == null) {
+            val cfg = getConfig()
+            logDao.upsert(
+                SavingsLogEntity(
+                    date = DateUtils.today(),
+                    targetAmount = cfg.dailyAmount,
+                    savedAmount = 0,
+                    status = SavingsStatus.PENDING,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /** Mark any past day still left PENDING as MISSED (daily rollover / boot). */
+    suspend fun finalizeStalePendingDays() {
+        logDao.markStalePendingAsMissed(DateUtils.today(), System.currentTimeMillis())
+    }
+
     // ---- Recovery codes ------------------------------------------------------------------------
 
     val recoveryCodes: Flow<List<RecoveryCodeEntity>> = recoveryDao.observeAll()

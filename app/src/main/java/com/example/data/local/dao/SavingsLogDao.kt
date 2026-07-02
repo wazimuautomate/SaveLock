@@ -29,4 +29,8 @@ interface SavingsLogDao {
     /** All logs newest-first, as a one-shot read (used for streak math). */
     @Query("SELECT * FROM savings_log ORDER BY date DESC")
     suspend fun getAllOrdered(): List<SavingsLogEntity>
+
+    /** Finalize any past day still left PENDING as MISSED (called on the daily rollover / boot). */
+    @Query("UPDATE savings_log SET status = 'MISSED', timestamp = :now WHERE status = 'PENDING' AND date < :today")
+    suspend fun markStalePendingAsMissed(today: String, now: Long): Int
 }
