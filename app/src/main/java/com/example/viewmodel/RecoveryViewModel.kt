@@ -2,74 +2,99 @@ package com.example.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.data.repository.SaveLockRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class RecoveryCode(
-    val code: String,
+    val code: String,     // masked display for stored codes ("••••-••••")
     val isUsed: Boolean
 )
 
 data class RecoveryUiState(
-    val codes: List<RecoveryCode> = listOf(
-        RecoveryCode("SL2A-9X7B", false),
-        RecoveryCode("SL5K-1W4P", false),
-        RecoveryCode("SL8N-3M2Q", true),
-        RecoveryCode("SL4V-6H8Y", false),
-        RecoveryCode("SL9T-5R1D", false),
-        RecoveryCode("SL3X-7Z9J", true),
-        RecoveryCode("SL6G-2F4V", false),
-        RecoveryCode("SL1B-8P5M", false),
-        RecoveryCode("SL7Q-9K3C", false),
-        RecoveryCode("SL0Y-2M1W", false)
-    ),
+    val codes: List<RecoveryCode> = emptyList(),
     val enteredCode: String = "",
     val codeValidationError: String? = null,
     val codeValidationSuccess: Boolean = false
 )
 
-class RecoveryViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(RecoveryUiState())
-    val uiState: StateFlow<RecoveryUiState> = _uiState.asStateFlow()
+/**
+ * Recovery-code entry (offline redeem) and the stored code list. Generation reveals plaintext ONCE
+ * via [revealedCodes]; after that only masked entries are shown.
+ */
+class RecoveryViewModel(private val repository: SaveLockRepository) : ViewModel() {
+
+    private data class Entry(
+        val enteredCode: String = "",
+        val error: String? = null,
+        val success: Boolean = false
+    )
+
+    private val entry = MutableStateFlow(Entry())
+
+    /** Plaintext codes to show exactly once, right after generation. Null the rest of the time. */
+    private val _revealedCodes = MutableStateFlow<List<String>?>(null)
+    val revealedCodes: StateFlow<List<String>?> = _revealedCodes.asStateFlow()
+
+    val uiState: StateFlow<RecoveryUiState> =
+        combine(repository.recoveryCodes, entry) { stored, e ->
+            RecoveryUiState(
+                codes = stored.map { RecoveryCode(it.maskedDisplay, it.used) },
+                enteredCode = e.enteredCode,
+                codeValidationError = e.error,
+                codeValidationSuccess = e.success
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecoveryUiState())
 
     fun updateEnteredCode(code: String) {
-        _uiState.update { it.copy(enteredCode = code.uppercase(), codeValidationError = null, codeValidationSuccess = false) }
+        entry.update { it.copy(enteredCode = code.uppercase(), error = null, success = false) }
     }
 
     fun submitRecoveryCode() {
-        val input = _uiState.value.enteredCode.trim()
+        val input = entry.value.enteredCode.trim()
         if (input.isEmpty()) {
-            _uiState.update { it.copy(codeValidationError = "Please enter a code") }
+            entry.update { it.copy(error = "Please enter a code") }
             return
         }
-
-        val matchingCode = _uiState.value.codes.find { it.code.equals(input, ignoreCase = true) }
-        if (matchingCode == null) {
-            _uiState.update { it.copy(codeValidationError = "Invalid recovery code. Please check the spelling.") }
-            Log.d("RecoveryVM", "Code validation failed: Invalid code")
-        } else if (matchingCode.isUsed) {
-            _uiState.update { it.copy(codeValidationError = "This recovery code has already been used.") }
-            Log.d("RecoveryVM", "Code validation failed: Already used code")
-        } else {
-            // Mark as success
-            _uiState.update { state ->
-                val updatedCodes = state.codes.map { item ->
-                    if (item.code == matchingCode.code) item.copy(isUsed = true) else item
-                }
-                state.copy(
-                    codes = updatedCodes,
-                    codeValidationSuccess = true,
-                    codeValidationError = null,
-                    enteredCode = ""
-                )
+        viewModelScope.launch {
+            val ok = repository.redeemRecoveryCode(input)  // OFFLINE — no network needed
+            if (ok) {
+                entry.update { it.copy(success = true, error = null, enteredCode = "") }
+                Log.d("RecoveryVM", "Recovery code accepted; today's lock lifted.")
+            } else {
+                entry.update { it.copy(error = "Invalid or already-used recovery code.") }
             }
-            Log.d("RecoveryVM", "Code validation success! Resetting lockout...")
         }
     }
 
     fun resetValidationState() {
-        _uiState.update { it.copy(codeValidationSuccess = false, codeValidationError = null, enteredCode = "") }
+        entry.update { it.copy(success = false, error = null, enteredCode = "") }
+    }
+
+    /** Generate a fresh batch, wiping old codes. The plaintext appears in [revealedCodes] once. */
+    fun generateNewCodes(count: Int = 10) {
+        viewModelScope.launch {
+            _revealedCodes.value = repository.regenerateRecoveryCodes(count)
+            Log.d("RecoveryVM", "Generated $count new recovery codes (shown once).")
+        }
+    }
+
+    /** Ensure codes exist the first time the list screen opens; reveals them once if newly made. */
+    fun ensureCodesExist(count: Int = 10) {
+        viewModelScope.launch {
+            val created = repository.ensureRecoveryCodesExist(count)
+            if (created != null) _revealedCodes.value = created
+        }
+    }
+
+    fun clearRevealed() {
+        _revealedCodes.value = null
     }
 }

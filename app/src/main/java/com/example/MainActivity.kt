@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         
         enableEdgeToEdge()
         setContent {
-            val settingsViewModel: SettingsViewModel = viewModel()
+            val settingsViewModel: SettingsViewModel = viewModel(factory = SaveLockViewModels.Factory)
             val settingsState by settingsViewModel.uiState.collectAsState()
 
             // Resolve dynamic app theme (Light / Dark / System default)
@@ -76,25 +76,12 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                // Instantiate rest of the ViewModels
-                val dashboardViewModel: DashboardViewModel = viewModel()
-                val historyViewModel: HistoryViewModel = viewModel()
-                val recoveryViewModel: RecoveryViewModel = viewModel()
-                val lockOverlayViewModel: LockOverlayViewModel = viewModel()
-
-                // Synchronize toggle switch between dashboard and settings states
-                val dashboardState by dashboardViewModel.uiState.collectAsState()
-
-                LaunchedEffect(dashboardState.isSavingEnabled) {
-                    if (dashboardState.isSavingEnabled != settingsState.isSavingEnabled) {
-                        settingsViewModel.toggleSavingEnabled(dashboardState.isSavingEnabled)
-                    }
-                }
-                LaunchedEffect(settingsState.isSavingEnabled) {
-                    if (settingsState.isSavingEnabled != dashboardState.isSavingEnabled) {
-                        dashboardViewModel.toggleSavingEnabled(settingsState.isSavingEnabled)
-                    }
-                }
+                // Instantiate rest of the ViewModels (all share the same repository-backed data,
+                // so the saving-enabled toggle stays in sync automatically — no manual bridging).
+                val dashboardViewModel: DashboardViewModel = viewModel(factory = SaveLockViewModels.Factory)
+                val historyViewModel: HistoryViewModel = viewModel(factory = SaveLockViewModels.Factory)
+                val recoveryViewModel: RecoveryViewModel = viewModel(factory = SaveLockViewModels.Factory)
+                val lockOverlayViewModel: LockOverlayViewModel = viewModel(factory = SaveLockViewModels.Factory)
 
                 // Bottom bar visibility control
                 val showBottomBar = currentRoute in listOf(

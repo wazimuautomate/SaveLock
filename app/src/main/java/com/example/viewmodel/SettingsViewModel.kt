@@ -2,10 +2,16 @@ package com.example.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.LockMode
+import com.example.data.repository.SaveLockRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class DistractionApp(
     val packageName: String,
@@ -21,101 +27,108 @@ data class SettingsUiState(
     val dailySavingsAmount: String = "500",
     val lockScheduleTime: String = "20:00",
     val reminderLeadHours: List<Int> = listOf(2, 1),
-    val mpesaNumber: String = "254712345678",
-    val distractionApps: List<DistractionApp> = listOf(
-        DistractionApp("com.android.chrome", "Google Chrome", true),
-        DistractionApp("com.facebook.katana", "Facebook", true),
-        DistractionApp("com.instagram.android", "Instagram", false),
-        DistractionApp("com.twitter.android", "X (Twitter)", true),
-        DistractionApp("com.zhiliaoapp.musically", "TikTok", false),
-        DistractionApp("com.youtube.android", "YouTube", true),
-        DistractionApp("com.netflix.mediaclient", "Netflix", false),
-        DistractionApp("com.reddit.frontpage", "Reddit", false)
-    ),
+    val mpesaNumber: String = "",
+    val distractionApps: List<DistractionApp> = emptyList(),
     val isSavingEnabled: Boolean = true,
+    val lockMode: LockMode = LockMode.CHOSEN_APPS,
     val showGenerateRecoveryWarning: Boolean = false,
     val amountError: String? = null,
     val mpesaError: String? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
-class SettingsViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(SettingsUiState())
-    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+/**
+ * Settings backed by Room. Persisted fields (amount, time, reminders, mpesa, distraction apps,
+ * saving-enabled, lock mode) go through the repository and reflect on next app open. Transient UI
+ * bits (validation text, theme choice, dialogs) live in [transient].
+ */
+class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel() {
+
+    private data class Transient(
+        val amountText: String? = null,   // in-progress edit; null => show persisted value
+        val mpesaText: String? = null,
+        val amountError: String? = null,
+        val mpesaError: String? = null,
+        val showGenerateRecoveryWarning: Boolean = false,
+        val themeMode: ThemeMode = ThemeMode.SYSTEM
+    )
+
+    private val transient = MutableStateFlow(Transient())
+
+    val uiState: StateFlow<SettingsUiState> =
+        combine(repository.config, transient) { cfg, t ->
+            SettingsUiState(
+                dailySavingsAmount = t.amountText ?: cfg.dailyAmount.toString(),
+                lockScheduleTime = cfg.lockTime,
+                reminderLeadHours = cfg.reminderLeadHours,
+                mpesaNumber = t.mpesaText ?: cfg.mpesaNumber,
+                distractionApps = cfg.distractionApps.map {
+                    DistractionApp(it.packageName, it.name, it.isRestricted)
+                },
+                isSavingEnabled = cfg.savingEnabled,
+                lockMode = cfg.lockMode,
+                showGenerateRecoveryWarning = t.showGenerateRecoveryWarning,
+                amountError = t.amountError,
+                mpesaError = t.mpesaError,
+                themeMode = t.themeMode
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun updateThemeMode(mode: ThemeMode) {
-        _uiState.update { it.copy(themeMode = mode) }
-        Log.d("SettingsVM", "Theme mode updated to: $mode")
+        transient.update { it.copy(themeMode = mode) }
     }
 
     fun updateDailySavingsAmount(amount: String) {
-        val parsedInt = amount.toIntOrNull()
-        _uiState.update { 
-            it.copy(
-                dailySavingsAmount = amount,
-                amountError = if (parsedInt != null && parsedInt > 0) null else "Enter a valid positive number"
-            )
+        val parsed = amount.toIntOrNull()
+        val valid = parsed != null && parsed > 0
+        transient.update {
+            it.copy(amountText = amount, amountError = if (valid) null else "Enter a valid positive number")
         }
-        Log.d("SettingsVM", "Updated savings amount to: $amount")
+        if (valid) viewModelScope.launch { repository.setDailyAmount(parsed!!) }
     }
 
     fun updateLockScheduleTime(time: String) {
-        _uiState.update { it.copy(lockScheduleTime = time) }
-        Log.d("SettingsVM", "Updated lock schedule to: $time")
+        viewModelScope.launch { repository.setLockTime(time) }
+    }
+
+    fun updateLockMode(mode: LockMode) {
+        viewModelScope.launch { repository.setLockMode(mode) }
+        Log.d("SettingsVM", "Lock mode set to $mode")
     }
 
     fun addReminderLeadTime(hours: Int) {
-        if (hours in 1..23 && !_uiState.value.reminderLeadHours.contains(hours)) {
-            _uiState.update { 
-                it.copy(reminderLeadHours = (it.reminderLeadHours + hours).sortedDescending()) 
-            }
-            Log.d("SettingsVM", "Added reminder lead: $hours hours")
-        }
+        viewModelScope.launch { repository.addReminderLeadHour(hours) }
     }
 
     fun removeReminderLeadTime(hours: Int) {
-        _uiState.update { 
-            it.copy(reminderLeadHours = it.reminderLeadHours.filter { item -> item != hours }) 
-        }
-        Log.d("SettingsVM", "Removed reminder lead: $hours hours")
+        viewModelScope.launch { repository.removeReminderLeadHour(hours) }
     }
 
     fun updateMpesaNumber(number: String) {
-        val isValid = Regex("^2547\\d{8}$").matches(number)
-        _uiState.update { 
-            it.copy(
-                mpesaNumber = number,
-                mpesaError = if (isValid) null else "Format must be 2547XXXXXXXX"
-            ) 
+        val valid = Regex("^2547\\d{8}$").matches(number)
+        transient.update {
+            it.copy(mpesaText = number, mpesaError = if (valid) null else "Format must be 2547XXXXXXXX")
         }
-        Log.d("SettingsVM", "Updated M-Pesa to: $number")
+        if (valid) viewModelScope.launch { repository.setMpesaNumber(number) }
     }
 
     fun toggleDistractionApp(packageName: String) {
-        _uiState.update { state ->
-            val updatedApps = state.distractionApps.map { app ->
-                if (app.packageName == packageName) {
-                    app.copy(isRestricted = !app.isRestricted)
-                } else {
-                    app
-                }
-            }
-            state.copy(distractionApps = updatedApps)
-        }
-        Log.d("SettingsVM", "Toggled app restriction for: $packageName")
+        viewModelScope.launch { repository.toggleDistractionApp(packageName) }
     }
 
     fun toggleSavingEnabled(enabled: Boolean) {
-        _uiState.update { it.copy(isSavingEnabled = enabled) }
-        Log.d("SettingsVM", "Master saving toggle updated: $enabled")
+        viewModelScope.launch { repository.setSavingEnabled(enabled) }
     }
 
     fun triggerGenerateRecoveryWarning(show: Boolean) {
-        _uiState.update { it.copy(showGenerateRecoveryWarning = show) }
+        transient.update { it.copy(showGenerateRecoveryWarning = show) }
     }
 
+    /**
+     * User confirmed regeneration. The actual generate + one-time reveal happens on the Recovery
+     * Codes screen (see RecoveryViewModel.generateNewCodes), which this navigates to via the UI.
+     */
     fun generateNewRecoveryCodes() {
-        _uiState.update { it.copy(showGenerateRecoveryWarning = false) }
-        Log.d("SettingsVM", "Generating brand new recovery codes. Old codes invalidated!")
+        transient.update { it.copy(showGenerateRecoveryWarning = false) }
     }
 }

@@ -1,9 +1,15 @@
 package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.SavingsLogEntity
+import com.example.data.local.entity.SavingsStatus
+import com.example.data.repository.SaveLockRepository
+import com.example.util.DateUtils
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 sealed interface HistoryStatus {
     object Saved : HistoryStatus
@@ -19,24 +25,37 @@ data class HistoryItem(
 )
 
 data class HistoryUiState(
-    val historyItems: List<HistoryItem> = listOf(
-        HistoryItem("Jul 01, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 30, 2026", "KES 500", "KES 0", HistoryStatus.Missed),
-        HistoryItem("Jun 29, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 28, 2026", "KES 500", "KES 0", HistoryStatus.RecoveryUsed),
-        HistoryItem("Jun 27, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 26, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 25, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 24, 2026", "KES 500", "KES 0", HistoryStatus.Missed),
-        HistoryItem("Jun 23, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 22, 2026", "KES 500", "KES 500", HistoryStatus.Saved),
-        HistoryItem("Jun 21, 2026", "KES 500", "KES 500", HistoryStatus.Saved)
-    ),
-    // Trend points represented as values from 0f to 1f (percentage of target reached)
-    val trendData: List<Float> = listOf(1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f)
+    val historyItems: List<HistoryItem> = emptyList(),
+    // Trend points 0f..1f (fraction of target reached), oldest -> newest.
+    val trendData: List<Float> = emptyList()
 )
 
-class HistoryViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(HistoryUiState())
-    val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
+/** Real history/trend backed by Room logs. Same UI contract as the old mock. */
+class HistoryViewModel(private val repository: SaveLockRepository) : ViewModel() {
+
+    val uiState: StateFlow<HistoryUiState> =
+        repository.logs
+            .map { logs ->
+                val items = logs.map { it.toHistoryItem() } // logs are newest-first (matches old UI)
+                val trend = logs
+                    .sortedBy { it.date }        // oldest -> newest for the chart
+                    .takeLast(12)
+                    .map { l ->
+                        if (l.targetAmount <= 0) 0f
+                        else (l.savedAmount.toFloat() / l.targetAmount).coerceIn(0f, 1f)
+                    }
+                HistoryUiState(historyItems = items, trendData = trend)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+
+    private fun SavingsLogEntity.toHistoryItem(): HistoryItem = HistoryItem(
+        date = DateUtils.isoToDisplay(date),
+        targetAmount = "KES %,d".format(targetAmount),
+        savedAmount = "KES %,d".format(savedAmount),
+        status = when (status) {
+            SavingsStatus.SAVED -> HistoryStatus.Saved
+            SavingsStatus.RECOVERY_USED -> HistoryStatus.RecoveryUsed
+            else -> HistoryStatus.Missed
+        }
+    )
 }

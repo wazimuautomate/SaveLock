@@ -33,6 +33,8 @@ Target devices: Samsung A05/A06 and similar low-end phones, Android **13+** (bui
 | Backend | **Supabase** — Edge Functions (`stk-push`, `stk-callback`, `stk-status`) + Postgres. Chosen for a free always-on HTTPS callback URL + DB + secret storage, nothing to self-host. |
 | Slimming | **Firebase / Gemini AI / App Check / secrets-gradle-plugin removed** (unused template leftovers). Keeps the app lightweight. |
 | Low-internet | Small JSON payloads, generous timeouts, polling with backoff so weak 2G/3G still works. |
+| Lock modes | **Two modes** on `SavingsConfig.lockMode`. `CHOSEN_APPS`: block only ticked apps. `FULL_LOCKDOWN`: block everything incl. Settings; home shows the lock screen only (Call/Messages/pay/recovery). |
+| Immovable rule | In BOTH modes, **emergency phone calls + the messaging app are never blockable** (hard-coded allow-list). Escape hatches: pay, recovery code, or **Safe Mode** (disables the accessibility service). Safe Mode + factory reset keep the app uninstallable. |
 
 ---
 

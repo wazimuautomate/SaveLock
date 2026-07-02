@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.SaveLockAmber
 import com.example.ui.theme.SaveLockPrimary
 import com.example.ui.theme.SaveLockRed
+import com.example.data.local.entity.LockMode
 import com.example.util.NotificationManagerHelper
 import com.example.viewmodel.SettingsViewModel
 import com.example.viewmodel.ThemeMode
@@ -267,6 +268,77 @@ fun SettingsScreen(
                             label = { Text("+ Add Reminder") },
                             leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp)) },
                             modifier = Modifier.testTag("add_reminder_chip")
+                        )
+                    }
+                }
+            }
+
+            // Section: Lock strictness mode
+            Text(
+                text = "LOCK STRICTNESS",
+                style = MaterialTheme.typography.labelMedium,
+                color = SaveLockPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "How strict is the lock?",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "\"Chosen apps\" blocks only the apps you tick below. \"Full lockdown\" blocks everything except phone calls and messages — even Settings.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        LockMode.values().forEach { mode ->
+                            val isSelected = uiState.lockMode == mode
+                            val label = when (mode) {
+                                LockMode.CHOSEN_APPS -> "Chosen apps"
+                                LockMode.FULL_LOCKDOWN -> "Full lockdown"
+                            }
+                            val icon = when (mode) {
+                                LockMode.CHOSEN_APPS -> Icons.Default.Apps
+                                LockMode.FULL_LOCKDOWN -> Icons.Default.Lock
+                            }
+                            ElevatedFilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.updateLockMode(mode) },
+                                label = { Text(label) },
+                                leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("lockmode_${mode.name.lowercase()}"),
+                                colors = FilterChipDefaults.elevatedFilterChipColors(
+                                    selectedContainerColor = SaveLockPrimary.copy(alpha = 0.2f),
+                                    selectedLabelColor = SaveLockPrimary,
+                                    selectedLeadingIconColor = SaveLockPrimary
+                                )
+                            )
+                        }
+                    }
+
+                    if (uiState.lockMode == LockMode.FULL_LOCKDOWN) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "⚠ Full lockdown also blocks Settings. To unlock you must pay, enter a recovery code, or restart the phone in Safe Mode. Keep your recovery codes written down somewhere safe.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SaveLockRed,
+                            lineHeight = 16.sp
                         )
                     }
                 }
