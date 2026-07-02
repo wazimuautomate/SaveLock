@@ -62,13 +62,29 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 - Decision: recovery codes are NOT auto-generated at startup (user must see them once) — generation
   handled at the Recovery screen / Settings action in the next step.
 
+**Progress (continued, 2026-07-03)**
+- ✅ Pushed `main` + `feature` to GitHub (owner logged into gh as wazimuautomate).
+- ✅ Created env templates: `backend/.env.example` (Daraja + Supabase server secrets) and
+  `app/savelock.properties.example` (backend URL + APP_BACKEND_KEY) → wired into `BuildConfig`
+  via gradle (`savelockProp`). Real `app/savelock.properties` is gitignored.
+- ✅ Two lock modes decided & scaffolded: `LockMode.CHOSEN_APPS` vs `FULL_LOCKDOWN`. Owner chose
+  FULL_LOCKDOWN = block everything incl. Settings; home shows lock screen only (Call/Messages).
+  Hard rule: emergency calls + messaging never blockable; escape via pay/recovery/Safe Mode.
+- ✅ Migrated ALL 5 ViewModels + MainActivity to repository Flows (commit 3a354ca). Added
+  `SaveLockViewModels.Factory`. Added Lock Strictness selector to Settings screen. Dashboard
+  payment still SIMULATED (writes real log on success) until task 10.
+
+**Known small limitation to revisit**
+- `repository.todayLog`/`totalSaved` compute "today" once at repo-singleton creation. Fine for daily
+  restarts; revisit if we need live midnight rollover.
+
 **Next up**
-- ⏳ Migrate the 5 ViewModels + MainActivity to consume the repository via ViewModel factories
-  (keep the exact UiState contracts). Read `RecoveryCodesScreen.kt` first (not yet read).
-- ⏳ Then scheduling, services, accessibility/overlay, device-admin, payment, backend.
-- ⚠️ Owner to run `gh auth login` so I can push `feature` to GitHub.
-- ⚠️ Will need: Supabase project URL + anon key (for the app) at payment stage; Daraja creds go only
-  into Supabase env vars (never in the app).
+- 🔄 Set up GitHub Actions cloud build (compile check + downloadable APK). No gradle wrapper exists;
+  toolchain is AGP 9.1.1 / compileSdk 36.1 (AI Studio). Iterate via `gh run` logs.
+- ⏳ Recovery wiring (read RecoveryCodesScreen + HistoryScreen first), scheduling, services,
+  accessibility/overlay, device-admin, payment, backend.
+- ⚠️ Will need Supabase project URL + APP_BACKEND_KEY at payment stage; Daraja creds go only into
+  Supabase env vars.
 
 **Open questions / watch-outs**
 - Need owner's Supabase project details (URL + anon key) before the app can call the backend —
