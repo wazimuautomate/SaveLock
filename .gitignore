@@ -1,0 +1,31 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.env
+.env.local
+debug.keystore
+
+# Secrets & signing (NEVER commit these)
+*.jks
+*.keystore
+google-services.json
+supabase/.env
+backend/.env
+
+# Backend / Node
+node_modules/
+.vercel
+.supabase
