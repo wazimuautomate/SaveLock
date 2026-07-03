@@ -11,6 +11,34 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 2: Feedback round 2 (CI green, commit 7a8389a)
+
+Urgent fixes from owner testing:
+- ✅ **Generate-codes ANR crash FIXED** — root cause: PBKDF2 hashing ran on the main thread.
+  Now wrapped in `withContext(Dispatchers.Default)` (both generate + verify). Codes capped at **3**;
+  iterations lowered to 50k for low-end phones.
+- ✅ Lock page: removed broken Call/Messages buttons; added ONE **Emergency call** button →
+  system emergency dialer (`com.android.phone.EmergencyDialer.DIAL`), never normal phone/SMS.
+- ✅ Accessibility allow-list tightened: normal dialer/SMS now BLOCKED in full lockdown (only
+  emergency infra + keyboard + systemui + self allowed).
+- ✅ Lock auto-dismiss: `recompute()` on overlay open; real activity finishes when `lockActive`→false;
+  simulate preview now also opens emergency dialer + auto-leaves on payment success.
+- ✅ Permission buttons fixed: added `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (Battery works);
+  `device_admin.xml` empty policy + Security-settings/app-details fallbacks (Uninstall Protection works).
+
+Decisions locked for the Savings/Goals redesign (owner answers):
+- Lock timing = **locked until you pay** each period. Flexible = **minimum you set**.
+- "random days/hours" = **every N you choose**. **One shared lock** (any due-unpaid plan triggers).
+
+Stage 1 DONE (additive/unused so far): plan data model — `SavingsPlanEntity`, `PlanPaymentEntity`,
+DAOs, `PlanLogic` (period index / isLockingNow / progress), Converters, DB **v3**.
+
+⏳ Stage 2 NEXT: repository plan methods + wire `LockStateManager` to plans (drop global lockTime),
+new Home (list + progress bars), Create Savings/Goal screen, per-plan payment targeting, per-plan
+recovery. Keep app compiling at each push.
+
+---
+
 ## 2026-07-03 — Session 2: Owner test feedback round 1 (CI green, commit bb98ea6)
 
 Fixed from owner testing:
