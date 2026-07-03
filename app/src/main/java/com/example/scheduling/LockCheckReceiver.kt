@@ -9,9 +9,9 @@ import com.example.util.NotificationManagerHelper
 import kotlinx.coroutines.launch
 
 /**
- * Fires at the daily lock time. Finalizes stale days, ensures today's row, and — if today isn't
- * saved — turns the lock on (starts the foreground service + status notification). Always re-arms
- * tomorrow's alarm and reminders.
+ * Fires when a plan's period boundary is reached. Recomputes the lock, and — if any plan is now
+ * due-and-unpaid — turns the lock on (starts the foreground service + status notification). Always
+ * re-arms for the next upcoming period boundary.
  */
 class LockCheckReceiver : BroadcastReceiver() {
 
@@ -20,19 +20,12 @@ class LockCheckReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         ServiceLocator.appScope.launch {
             try {
-                val repo = ServiceLocator.repository
-                repo.finalizeStalePendingDays()
-                repo.ensureTodayPending()
-                val cfg = repo.getConfig()
-                val resolved = repo.isTodayResolved()
-                ServiceLocator.lockStateManager.recompute()
-
-                if (cfg.savingEnabled && !resolved) {
+                val locked = ServiceLocator.lockStateManager.recompute()
+                if (locked) {
                     SaveLockForegroundService.start(app)
-                    NotificationManagerHelper.showLockActive(app, cfg.dailyAmount)
+                    NotificationManagerHelper.showLockActive(app, 0)
                 }
-
-                // Re-arm for the next day (exact alarm + reminders).
+                // Re-arm for the next upcoming period boundary.
                 AlarmScheduler.rescheduleAll(app)
             } finally {
                 pending.finish()

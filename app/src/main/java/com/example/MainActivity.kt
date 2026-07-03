@@ -123,13 +123,21 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Dashboard.route,
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        // 1. Dashboard Screen
+                        // 1. Home Screen (Savings & Goals)
                         composable(Screen.Dashboard.route) {
                             DashboardScreen(
                                 viewModel = dashboardViewModel,
-                                onNavigateToRecoveryCode = {
-                                    navController.navigate(Screen.RecoveryCodeEntry.route)
+                                onNavigateToCreatePlan = {
+                                    navController.navigate(Screen.CreatePlan.route)
                                 }
+                            )
+                        }
+
+                        // 1b. Create Savings / Goal
+                        composable(Screen.CreatePlan.route) {
+                            CreatePlanScreen(
+                                viewModel = dashboardViewModel,
+                                onDone = { navController.popBackStack() }
                             )
                         }
 

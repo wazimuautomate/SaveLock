@@ -96,10 +96,6 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
-    var showAddLeadDialog by remember { mutableStateOf(false) }
-    var newLeadHoursText by remember { mutableStateOf("") }
-    var leadHoursError by remember { mutableStateOf<String?>(null) }
-
     val context = LocalContext.current
 
     Box(
@@ -253,153 +249,6 @@ fun SettingsScreen(
                             errorBorderColor = SaveLockRed
                         )
                     )
-                }
-            }
-
-            // Section 2: Trigger Clock & Reminders
-            Text(
-                text = "DISCIPLINE TRIGGER CLOCK",
-                style = MaterialTheme.typography.labelMedium,
-                color = SaveLockPrimary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // Time Selector Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Daily Lockout Trigger",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Time when apps are locked out if unpaid",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // High fidelity interactive Time Adjuster
-                        val parsedTime = uiState.lockScheduleTime.split(":")
-                        var hour = parsedTime.getOrNull(0)?.toIntOrNull() ?: 20
-                        var minute = parsedTime.getOrNull(1)?.toIntOrNull() ?: 0
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier
-                                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(
-                                    onClick = { 
-                                        hour = (hour + 1) % 24
-                                        viewModel.updateLockScheduleTime(String.format("%02d:%02d", hour, minute))
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Default.ArrowDropUp, contentDescription = "Add Hour") }
-                                
-                                Text(
-                                    text = String.format("%02d", hour),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black
-                                )
-                                
-                                IconButton(
-                                    onClick = { 
-                                        hour = if (hour == 0) 23 else hour - 1
-                                        viewModel.updateLockScheduleTime(String.format("%02d:%02d", hour, minute))
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Default.ArrowDropDown, contentDescription = "Subtract Hour") }
-                            }
-
-                            Text(":", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                IconButton(
-                                    onClick = { 
-                                        minute = (minute + 5) % 60
-                                        viewModel.updateLockScheduleTime(String.format("%02d:%02d", hour, minute))
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Default.ArrowDropUp, contentDescription = "Add Minute") }
-                                
-                                Text(
-                                    text = String.format("%02d", minute),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black
-                                )
-                                
-                                IconButton(
-                                    onClick = { 
-                                        minute = if (minute < 5) 55 else minute - 5
-                                        viewModel.updateLockScheduleTime(String.format("%02d:%02d", hour, minute))
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) { Icon(Icons.Default.ArrowDropDown, contentDescription = "Subtract Minute") }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Lead Reminders Section
-                    Text(
-                        text = "Lead Time Reminders",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Receive notifications ahead of the lockout deadline:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    // Dynamic chips flow
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.reminderLeadHours.forEach { hours ->
-                            InputChip(
-                                selected = true,
-                                onClick = { viewModel.removeReminderLeadTime(hours) },
-                                label = { Text("$hours ${if (hours == 1) "hour" else "hours"} before") },
-                                trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp)) },
-                                modifier = Modifier.testTag("reminder_chip_$hours")
-                            )
-                        }
-
-                        // Add Lead Button Chip
-                        AssistChip(
-                            onClick = { 
-                                newLeadHoursText = ""
-                                leadHoursError = null
-                                showAddLeadDialog = true 
-                            },
-                            label = { Text("+ Add Reminder") },
-                            leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                            modifier = Modifier.testTag("add_reminder_chip")
-                        )
-                    }
                 }
             }
 
@@ -783,7 +632,7 @@ fun SettingsScreen(
                                     NotificationManagerHelper.CHANNEL_LOCK_ALERTS,
                                     102,
                                     "Critical Lock Warning! ⚠️",
-                                    "SaveLock Schedule triggers in ${uiState.lockScheduleTime}. Pay KES ${uiState.dailySavingsAmount} to prevent app lockout."
+                                    "A savings payment is due soon. Pay on time to prevent your apps from locking."
                                 )
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SaveLockRed),
@@ -806,60 +655,6 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(100.dp)) // Padding from BottomNav
-        }
-
-        // Add Reminder Lead Time Dialog
-        if (showAddLeadDialog) {
-            AlertDialog(
-                onDismissRequest = { showAddLeadDialog = false },
-                title = { Text("Add Reminder Lead Time") },
-                text = {
-                    Column {
-                        Text(
-                            text = "Enter hours before lockout deadline to receive a push notification:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = newLeadHoursText,
-                            onValueChange = {
-                                newLeadHoursText = it
-                                val hours = it.toIntOrNull()
-                                leadHoursError = if (hours == null || hours < 1 || hours > 23) "Enter a value between 1 and 23" else null
-                            },
-                            label = { Text("Lead Time (Hours)") },
-                            isError = leadHoursError != null,
-                            supportingText = { Text(leadHoursError ?: "1 to 23 hours ahead") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SaveLockPrimary)
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            val hours = newLeadHoursText.toIntOrNull()
-                            if (hours != null && hours in 1..23) {
-                                viewModel.addReminderLeadTime(hours)
-                                showAddLeadDialog = false
-                            } else {
-                                leadHoursError = "Enter a value between 1 and 23"
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary)
-                    ) {
-                        Text("Add")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showAddLeadDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
         }
 
         // Generate Recovery Codes warning dialog

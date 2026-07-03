@@ -18,8 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,49 +44,36 @@ fun OverlayScreen(
     val scrollState = rememberScrollState()
     var isSheetOpen by remember { mutableStateOf(false) }
 
-    // Synchronize bottom sheet open state with Payment Status
     LaunchedEffect(dashboardUiState.paymentStatus) {
-        if (dashboardUiState.paymentStatus != PaymentStatus.Idle) {
-            isSheetOpen = true
-        }
+        if (dashboardUiState.paymentStatus != PaymentStatus.Idle) isSheetOpen = true
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    val duePlans = dashboardUiState.plans.filter { it.isLocking }
+
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // RESTRICTED RED HEADER EMBLEM
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(88.dp)
                     .clip(CircleShape)
                     .background(SaveLockRed.copy(alpha = 0.15f))
                     .border(2.dp, SaveLockRed, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Device Restricted",
-                    tint = SaveLockRed,
-                    modifier = Modifier.size(44.dp)
-                )
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = SaveLockRed, modifier = Modifier.size(40.dp))
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "You Haven't Saved Today",
+                text = "Phone Locked",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color = SaveLockRed,
@@ -96,8 +81,6 @@ fun OverlayScreen(
             )
 
             Spacer(modifier = Modifier.height(12.dp))
-
-            // Non-aggressive but highly legible banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -105,15 +88,8 @@ fun OverlayScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         text = uiState.bannerMessage,
                         style = MaterialTheme.typography.bodySmall,
@@ -123,93 +99,63 @@ fun OverlayScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // Amount Due Display
-            Text(
-                text = "DAILY TARGET DUE",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                letterSpacing = 1.5.sp,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = uiState.amountDue,
-                style = MaterialTheme.typography.headlineLarge,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Primary save/unlock action
-            Button(
-                onClick = { 
-                    dashboardViewModel.resetPaymentState()
-                    isSheetOpen = true 
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .testTag("overlay_save_now_button"),
-                colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Payment, contentDescription = null)
-                    Text(
-                        text = "Save Now & Unlock",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Secondary unlock link
-            TextButton(
-                onClick = onNavigateToRecoveryEntry,
-                modifier = Modifier
-                    .testTag("overlay_recovery_link")
-                    .height(48.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.VpnKey,
-                        contentDescription = null,
-                        tint = SaveLockAmber,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "Enter emergency recovery code",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = SaveLockAmber
-                    )
+            // Each plan that is currently due, with its own Pay button.
+            if (duePlans.isEmpty()) {
+                Text(
+                    text = "Resolving…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                duePlans.forEach { plan ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text(plan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "${plan.typeLabel} • ${plan.detailLabel}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = {
+                                    dashboardViewModel.resetPaymentState()
+                                    dashboardViewModel.openPaymentForPlan(plan.id)
+                                    isSheetOpen = true
+                                },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Pay KES %,d & unlock".format(plan.payAmount), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
 
-            // Emergency access is ALWAYS available on the lock screen — it opens the system EMERGENCY
-            // dialer (for 999/112-type calls), never the normal phone or messages. Nothing else is
-            // reachable while locked.
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = onNavigateToRecoveryEntry,
+                modifier = Modifier.testTag("overlay_recovery_link").height(48.dp)
+            ) {
+                Icon(Icons.Default.VpnKey, contentDescription = null, tint = SaveLockAmber, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Enter emergency recovery code", fontWeight = FontWeight.Bold, color = SaveLockAmber)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             OutlinedButton(
                 onClick = onOpenEmergency,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("overlay_emergency_button"),
+                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("overlay_emergency_button"),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = SaveLockRed)
             ) {
                 Icon(Icons.Default.Emergency, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -220,13 +166,9 @@ fun OverlayScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
 
-        // Integrated Payment Sheet presentation for seamless pay-from-lock experience
         if (isSheetOpen) {
             ModalBottomSheet(
-                onDismissRequest = { 
-                    isSheetOpen = false
-                    dashboardViewModel.resetPaymentState()
-                },
+                onDismissRequest = { isSheetOpen = false; dashboardViewModel.resetPaymentState() },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ) {
                 PaymentSheetContent(
@@ -236,10 +178,7 @@ fun OverlayScreen(
                     phoneError = dashboardUiState.paymentPhoneError,
                     onPhoneChange = { dashboardViewModel.updateMpesaNumber(it) },
                     onSendRequest = { dashboardViewModel.triggerPayment() },
-                    onDismiss = { 
-                        isSheetOpen = false
-                        dashboardViewModel.resetPaymentState()
-                    }
+                    onDismiss = { isSheetOpen = false; dashboardViewModel.resetPaymentState() }
                 )
             }
         }

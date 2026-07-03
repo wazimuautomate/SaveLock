@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String, val title: String) {
     object Dashboard : Screen("dashboard", "Dashboard")
+    object CreatePlan : Screen("create_plan", "Create Plan")
     object History : Screen("history", "History")
     object Settings : Screen("settings", "Settings")
     object RecoveryCodes : Screen("recovery_codes", "Recovery Codes")

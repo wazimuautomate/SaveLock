@@ -1,12 +1,17 @@
 package com.example.data.repository
 
+import com.example.data.local.dao.PlanPaymentDao
 import com.example.data.local.dao.RecoveryCodeDao
 import com.example.data.local.dao.SavingsConfigDao
 import com.example.data.local.dao.SavingsLogDao
+import com.example.data.local.dao.SavingsPlanDao
+import com.example.data.local.entity.PlanPaymentEntity
 import com.example.data.local.entity.RecoveryCodeEntity
 import com.example.data.local.entity.SavingsConfigEntity
 import com.example.data.local.entity.SavingsLogEntity
+import com.example.data.local.entity.SavingsPlanEntity
 import com.example.data.local.entity.SavingsStatus
+import com.example.domain.PlanLogic
 import com.example.domain.RecoveryCodeManager
 import com.example.util.DateUtils
 import kotlinx.coroutines.Dispatchers
@@ -23,8 +28,67 @@ class SaveLockRepository(
     private val configDao: SavingsConfigDao,
     private val logDao: SavingsLogDao,
     private val recoveryDao: RecoveryCodeDao,
+    private val planDao: SavingsPlanDao,
+    private val planPaymentDao: PlanPaymentDao,
     private val recoveryCodeManager: RecoveryCodeManager
 ) {
+
+    // ---- Savings / Goal plans -------------------------------------------------------------------
+
+    /** All currently-active plans (Savings + Goals), newest first. Drives the Home list + lock. */
+    val activePlans: Flow<List<SavingsPlanEntity>> = planDao.observeActive()
+
+    /** Every plan payment ever made — the lock logic and progress bars read this. */
+    val allPayments: Flow<List<PlanPaymentEntity>> = planPaymentDao.observeAll()
+
+    /** Grand total actually saved across all plans (real money only, excludes recovery unlocks). */
+    val planTotalSaved: Flow<Int> =
+        allPayments.map { list -> list.filter { !it.viaRecovery }.sumOf { it.amount } }
+
+    suspend fun getActivePlans(): List<SavingsPlanEntity> = planDao.getActive()
+
+    suspend fun getPlan(id: Long): SavingsPlanEntity? = planDao.getById(id)
+
+    suspend fun createPlan(plan: SavingsPlanEntity): Long = planDao.insert(plan)
+
+    /** Stop a plan and forget its payments (used for delete/complete). */
+    suspend fun deletePlan(id: Long) {
+        planDao.deactivate(id)
+        planPaymentDao.deleteForPlan(id)
+    }
+
+    /**
+     * Record a payment (or recovery unlock) toward [planId]. The period index is computed from the
+     * plan's schedule so we know which period this satisfies. Safe no-op if the plan is gone.
+     */
+    suspend fun recordPlanPayment(
+        planId: Long,
+        amount: Int,
+        checkoutRequestId: String?,
+        viaRecovery: Boolean = false
+    ) {
+        val plan = planDao.getById(planId) ?: return
+        val now = System.currentTimeMillis()
+        planPaymentDao.insert(
+            PlanPaymentEntity(
+                planId = planId,
+                amount = amount,
+                periodIndex = PlanLogic.currentPeriodIndex(plan, now),
+                timestamp = now,
+                checkoutRequestId = checkoutRequestId,
+                viaRecovery = viaRecovery
+            )
+        )
+    }
+
+    /** How much is still owed for [planId]'s CURRENT period (what "Save now" should charge). */
+    suspend fun amountDueNow(planId: Long): Int {
+        val plan = planDao.getById(planId) ?: return 0
+        val now = System.currentTimeMillis()
+        val paid = planPaymentDao.sumForPeriod(plan.id, PlanLogic.currentPeriodIndex(plan, now))
+        val remaining = PlanLogic.requiredAmount(plan) - paid
+        return if (remaining > 0) remaining else PlanLogic.requiredAmount(plan)
+    }
 
     // ---- Config ---------------------------------------------------------------------------------
 
@@ -182,7 +246,9 @@ class SaveLockRepository(
 
     /**
      * Try to redeem [input] against the stored (hashed) codes. On success, marks the code used and
-     * records today's log as RECOVERY_USED. Returns true if a valid, unused code matched. OFFLINE.
+     * satisfies the CURRENT period of every plan that is currently locking (a viaRecovery "payment"
+     * for the shortfall), so the lock lifts everywhere. Returns true if a valid, unused code matched.
+     * Fully OFFLINE — no network needed.
      */
     suspend fun redeemRecoveryCode(input: String): Boolean {
         val unused = recoveryDao.getUnused()
@@ -191,6 +257,20 @@ class SaveLockRepository(
             unused.firstOrNull { recoveryCodeManager.verify(input, it) }
         } ?: return false
         recoveryDao.markUsed(match.id, System.currentTimeMillis())
+
+        // Clear the lock: for each active plan that is due-and-unpaid this period, log the shortfall
+        // as a recovery unlock (no real money) so its current period counts as satisfied.
+        val now = System.currentTimeMillis()
+        for (plan in planDao.getActive()) {
+            val payments = planPaymentDao.getForPlan(plan.id)
+            if (PlanLogic.isGoalCompleted(plan, payments, now)) continue
+            val idx = PlanLogic.currentPeriodIndex(plan, now)
+            val paid = payments.filter { it.periodIndex == idx }.sumOf { it.amount }
+            val shortfall = PlanLogic.requiredAmount(plan) - paid
+            if (shortfall > 0) {
+                recordPlanPayment(plan.id, shortfall, checkoutRequestId = null, viaRecovery = true)
+            }
+        }
         markRecoveryUsedToday()
         return true
     }

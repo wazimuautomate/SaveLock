@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.di.ServiceLocator
 import com.example.scheduling.AlarmScheduler
 import com.example.util.NotificationManagerHelper
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
@@ -27,9 +28,12 @@ class SaveLockApplication : Application() {
             // Arm alarms/reminders from the current config on startup.
             AlarmScheduler.rescheduleAll(this@SaveLockApplication)
 
-            // Re-arm whenever a schedule-affecting field changes (lock time, reminders, enabled flag).
-            ServiceLocator.repository.config
-                .map { Triple(it.lockTime, it.reminderLeadHours, it.savingEnabled) }
+            // Re-arm whenever the plan set or the master enabled flag changes (a new plan means a
+            // new period boundary to watch; disabling saving cancels the alarm).
+            combine(
+                ServiceLocator.repository.activePlans,
+                ServiceLocator.repository.config.map { it.savingEnabled }.distinctUntilChanged()
+            ) { plans, enabled -> plans.map { it.id } to enabled }
                 .distinctUntilChanged()
                 .drop(1) // the initial value was already handled by the rescheduleAll above
                 .collect {

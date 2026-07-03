@@ -5,13 +5,11 @@ import android.content.Context
 import android.content.Intent
 import com.example.di.ServiceLocator
 import com.example.service.SaveLockForegroundService
-import com.example.util.DateUtils
 import kotlinx.coroutines.launch
 
 /**
  * Re-arms everything after a reboot (alarms are cleared on boot). Also restarts the lock if the
- * device booted after the deadline with the day still unsaved — this is what makes the lock
- * "survive a restart".
+ * device booted with any plan due-and-unpaid — this is what makes the lock "survive a restart".
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -26,13 +24,8 @@ class BootReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         ServiceLocator.appScope.launch {
             try {
-                val repo = ServiceLocator.repository
-                repo.finalizeStalePendingDays()
                 AlarmScheduler.rescheduleAll(app)
-                val cfg = repo.getConfig()
-                ServiceLocator.lockStateManager.recompute()
-
-                if (cfg.savingEnabled && !repo.isTodayResolved() && DateUtils.isPastLockTime(cfg.lockTime)) {
+                if (ServiceLocator.lockStateManager.recompute()) {
                     SaveLockForegroundService.start(app)
                 }
             } finally {

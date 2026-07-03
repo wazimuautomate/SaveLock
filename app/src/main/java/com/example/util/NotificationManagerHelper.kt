@@ -69,14 +69,16 @@ object NotificationManagerHelper {
             .setContentIntent(openAppIntent(context))
             .build()
 
-    /** Fired when the deadline passes unpaid and the lock turns on. */
+    /** Fired when a plan becomes due-and-unpaid and the lock turns on. [amount] 0 = unspecified. */
     fun showLockActive(context: Context, amount: Int) {
+        val body = if (amount > 0) "You still owe KES $amount. Pay or use a recovery code to unlock."
+        else "A savings payment is due. Pay a plan or use a recovery code to unlock."
         notify(
             context,
             CHANNEL_LOCK_ALERTS,
             ID_LOCK_ACTIVE,
             "Apps locked — save to unlock",
-            "You haven't saved KES $amount today. Pay or use a recovery code to unlock.",
+            body,
             NotificationCompat.PRIORITY_HIGH
         )
     }

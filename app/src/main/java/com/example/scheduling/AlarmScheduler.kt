@@ -5,18 +5,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.example.di.ServiceLocator
-import com.example.util.DateUtils
-import java.util.concurrent.TimeUnit
+import com.example.domain.PlanLogic
 
 /**
- * Schedules the daily exact lock-check alarm (AlarmManager) and the lead-time reminders (WorkManager).
- * Everything is re-armed after each fire and after boot, which is what makes the lock reliable on
- * OEMs that kill background work.
+ * Schedules an exact lock-check alarm (AlarmManager) at the next moment ANY active plan starts a new
+ * period (a new period that isn't yet paid means the lock should arm). Re-armed after each fire and
+ * after boot, which is what makes the lock reliable on OEMs that kill background work.
  */
 object AlarmScheduler {
 
@@ -24,10 +20,9 @@ object AlarmScheduler {
     private const val LOCK_REQUEST_CODE = 1001
     private const val REMINDER_TAG = "savelock_reminder"
 
-    /** Exact alarm at the next lock time; falls back to inexact-while-idle if exact isn't permitted. */
-    fun scheduleDailyLockCheck(context: Context, lockTime: String) {
+    /** Exact alarm at [triggerAt]; falls back to inexact-while-idle if exact isn't permitted. */
+    fun scheduleLockCheckAt(context: Context, triggerAt: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        val triggerAt = DateUtils.nextLockOccurrenceMillis(lockTime)
         val pi = lockCheckPendingIntent(context)
         val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
         if (canExact) {
@@ -49,34 +44,24 @@ object AlarmScheduler {
         return PendingIntent.getBroadcast(context, LOCK_REQUEST_CODE, intent, flags)
     }
 
-    /** One WorkManager job per lead hour, at (lockTime - leadHours). Re-enqueued daily. */
-    fun scheduleReminders(context: Context, lockTime: String, leadHours: List<Int>) {
-        val wm = WorkManager.getInstance(context)
-        leadHours.forEach { lead ->
-            val delay = DateUtils.nextReminderMillis(lockTime, lead) - System.currentTimeMillis()
-            if (delay <= 0) return@forEach
-            val work = OneTimeWorkRequestBuilder<ReminderWorker>()
-                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-                .setInputData(workDataOf(ReminderWorker.KEY_LEAD_HOURS to lead))
-                .addTag(REMINDER_TAG)
-                .build()
-            wm.enqueueUniqueWork("${REMINDER_TAG}_$lead", ExistingWorkPolicy.REPLACE, work)
-        }
-    }
-
     fun cancelReminders(context: Context) {
         WorkManager.getInstance(context).cancelAllWorkByTag(REMINDER_TAG)
     }
 
-    /** Read the current config and (re)schedule everything, or cancel it all if saving is disabled. */
+    /**
+     * Read the current plans and arm the alarm for the earliest upcoming period boundary, or cancel
+     * everything if saving is disabled / there are no active plans.
+     */
     suspend fun rescheduleAll(context: Context) {
         val cfg = ServiceLocator.repository.getConfig()
-        if (cfg.savingEnabled) {
-            scheduleDailyLockCheck(context, cfg.lockTime)
-            scheduleReminders(context, cfg.lockTime, cfg.reminderLeadHours)
+        val plans = ServiceLocator.repository.getActivePlans()
+        cancelReminders(context) // lead-time reminders were removed in favour of per-plan periods
+        if (cfg.savingEnabled && plans.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            val next = plans.minOf { PlanLogic.nextBoundaryMillis(it, now) }
+            scheduleLockCheckAt(context, next)
         } else {
             cancelDailyLockCheck(context)
-            cancelReminders(context)
         }
     }
 }

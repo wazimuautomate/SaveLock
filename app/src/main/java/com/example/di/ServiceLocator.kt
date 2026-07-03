@@ -77,6 +77,8 @@ object ServiceLocator {
             configDao = database.configDao(),
             logDao = database.logDao(),
             recoveryDao = database.recoveryDao(),
+            planDao = database.planDao(),
+            planPaymentDao = database.planPaymentDao(),
             recoveryCodeManager = recoveryCodeManager
         )
     }
