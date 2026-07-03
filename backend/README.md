@@ -34,8 +34,11 @@ supabase link --project-ref YOUR-PROJECT-REF
 # 2. Create the database table
 supabase db push
 
-# 3. Put your secrets on the server (copy backend/.env.example -> backend/.env and fill it in first)
-supabase secrets set --env-file backend/.env
+# 3. Put your secrets on the server (copy backend/.env.example -> backend/.env and fill it in first).
+#    NOTE: Supabase rejects secrets that start with SUPABASE_ (it injects those itself), so filter them:
+grep -vE '^SUPABASE_' backend/.env > backend/.env.secrets
+supabase secrets set --env-file backend/.env.secrets
+rm backend/.env.secrets
 
 # 4. Deploy the three functions
 supabase functions deploy stk-push

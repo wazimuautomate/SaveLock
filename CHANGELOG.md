@@ -7,6 +7,16 @@ This project uses date-based entries (personal, non-versioned build).
 ## [Unreleased]
 
 ### Added
+- **Edit a plan**: each Savings/Goal on Home now has an edit button to change its name, amount,
+  schedule, or goal target without deleting it.
+- **Payment history**: the History tab now lists every real payment (which plan, when, how much)
+  plus recovery-code unlocks, with a recent-payments trend and your total saved.
+
+### Changed
+- **Payments now go to a Till (Buy Goods)** via `TILL_NUMBER`, with the reference shown as
+  "save" or "goal" depending on the plan. (Set `DARAJA_TX_TYPE=CustomerPayBillOnline` to use a paybill.)
+
+### Added (Savings & Goals)
 - **Savings & Goals plans** — run many at once, side by side. A **Savings** plan repeats forever
   (save a set amount every period); a **Goal** works toward a target total. The Home screen now
   lists each plan with a live progress bar, its status, a Save/Pay button, and a delete option.

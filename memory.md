@@ -11,6 +11,30 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 4: Till payments + polish (CI GREEN, commit 0a5c684)
+
+- ✅ **Till (Buy Goods) payments**: `daraja.ts` now sends `TransactionType=CustomerBuyGoodsOnline`,
+  `PartyB=TILL_NUMBER` (shortcode only builds the password), `AccountReference` = "save"/"goal".
+  `DARAJA_TX_TYPE` toggles back to paybill. Owner's till `TILL_NUMBER=3156744` is already in
+  `backend/.env`. App threads "save"/"goal" through `StkPushRequest` → `PaymentRepository.pay` →
+  `DashboardViewModel` (from plan type).
+- ✅ **Edit a plan**: Home cards have an edit button; `CreatePlanScreen` doubles as an edit form
+  (prefilled) via route `create_plan?planId=`. Keeps id/createdAt anchor + payments.
+- ✅ **Plan-payment History**: History tab now lists real plan payments (name, date, amount,
+  recovery vs paid) + recent-payments trend + total saved. Dropped the legacy per-day log view.
+
+⚠️ **DEPLOY BLOCKED / owner action**: the `SUPABASE_ACCESS_TOKEN` present in this dev environment
+belongs to a DIFFERENT account (sees projects Pdf-tracking-system / RossBot / etc., NOT SaveLock).
+It gets 403 on project `kvdugtdgobtjtychifzb`, so I could NOT push secrets/functions/DB. Owner must
+run the deploy from their own logged-in account (commands in `backend/README.md`; note the
+`grep -vE '^SUPABASE_'` filter before `secrets set`). Backend/app CODE is committed + CI-green.
+
+⏳ Remaining polish ideas (not yet done): edit shouldn't silently shift period anchor if owner expects
+"restart schedule now"; consider a "pause plan" vs delete; prune dead legacy (SavingsLog/lockTime/
+ReminderWorker/DateUtils lock-time helpers); optional per-plan reminder notifications.
+
+---
+
 ## 2026-07-03 — Session 3: Savings & Goals Stage 2 (CI GREEN, commit f519016)
 
 Owner said "keep going straight through Stage 2, build everything quickly." Done end-to-end and
