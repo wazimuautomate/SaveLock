@@ -11,6 +11,29 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 7: Rotating provoking lock copy + fix backend secret name
+
+- 🐛 **Root cause of "Supabase & Daraja not set"**: the repo's GitHub Actions **URL secret was
+  misnamed** `SUPABASE_FUNCTIONS_KEY` — the CI reads `SUPABASE_FUNCTIONS_URL`. So `$URL` was empty and
+  even today's latest `main` build logged "No backend secrets set — building UNCONFIGURED". The APK
+  therefore had a blank `BuildConfig.SUPABASE_FUNCTIONS_URL` → `isBackendConfigured=false` →
+  DashboardViewModel shows the "M-Pesa isn't set up" message. Fix = create secret with the correct
+  name (value `https://kvdugtdgobtjtychifzb.functions.supabase.co`) + delete the stray one + rebuild.
+  `APP_BACKEND_KEY` was already named correctly. (App code wiring itself was fine — URL/base/paths OK.)
+- ✅ **Rotating lock-screen messages** (owner's aggressive, pain-pointed copy). New
+  `domain/LockMessages.kt`: two pools (SAVINGS 6 unique, GOALS 8) of title+subtitle; one per day,
+  rotates by `LocalDate.now().toEpochDay()`. Goal templates fill `{GOAL} {DAYS_LEFT}
+  {AMOUNT_REMAINING} {PERCENT}`. Added `goalDaysLeft/goalAmountRemaining/goalPercent` to `PlanRow`
+  (computed in `DashboardViewModel.toPlanRow`). `LockScreenContent.MainPanel` now renders the
+  rotating title (auto-shrinks 26→22→19sp by length) + subtitle, replacing the "Phone Locked" +
+  generic info banner; keeps a small "full lockdown" note. Pool follows the first due plan's type.
+  (Owner's list had 2 exact savings duplicates — dropped so nothing repeats within a rotation.)
+- ⚠️ Still owner-side for payments to complete end-to-end: register `/stk-callback` in the Daraja
+  portal, and confirm **Verify JWT is OFF** on the dashboard-deployed functions (config.toml sets it
+  false but that only applies to CLI deploys).
+
+---
+
 ## 2026-07-03 — Session 6: Real payments + final hardening + MERGE TO MAIN (CI GREEN, 112e2b3)
 
 - ✅ **Payments are REAL** — removed the demo/mock success. Backend not configured → clear "not set up"

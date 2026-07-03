@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 sealed interface PaymentStatus {
     object Idle : PaymentStatus
@@ -46,7 +47,11 @@ data class PlanRow(
     val isComplete: Boolean,
     val payAmount: Int,          // charge for "Save now" (period shortfall, or the full amount)
     val isFlexible: Boolean,     // true = user types the amount (>= minAmount)
-    val minAmount: Int           // per-period minimum (the amount the user set)
+    val minAmount: Int,          // per-period minimum (the amount the user set)
+    // Goal-only stats, used by the rotating lock-screen copy (0 for savings plans).
+    val goalDaysLeft: Int = 0,
+    val goalAmountRemaining: Int = 0,
+    val goalPercent: Int = 0
 )
 
 data class DashboardUiState(
@@ -162,6 +167,17 @@ class DashboardViewModel(
             else -> "Paid — up to date"
         }
 
+        // Goal stats for the rotating lock copy. Days left counts whole days remaining until the
+        // goal's duration is up; amount remaining is what's still needed to hit the target.
+        val goalDaysLeft = if (plan.type == PlanType.GOAL && plan.goalDurationDays > 0) {
+            val endMs = plan.createdAt + plan.goalDurationDays.toLong() * 86_400_000L
+            val remainingMs = endMs - now
+            if (remainingMs <= 0) 0 else kotlin.math.ceil(remainingMs / 86_400_000.0).toInt()
+        } else 0
+        val goalAmountRemaining =
+            if (plan.type == PlanType.GOAL) (plan.goalTotal - totalForPlan).coerceAtLeast(0) else 0
+        val goalPercent = (PlanLogic.progressFraction(plan, payments, now) * 100).roundToInt()
+
         return PlanRow(
             id = plan.id,
             name = plan.name,
@@ -175,7 +191,10 @@ class DashboardViewModel(
             isComplete = complete,
             payAmount = payAmount,
             isFlexible = plan.amountType == AmountType.FLEXIBLE,
-            minAmount = required
+            minAmount = required,
+            goalDaysLeft = goalDaysLeft,
+            goalAmountRemaining = goalAmountRemaining,
+            goalPercent = goalPercent
         )
     }
 
