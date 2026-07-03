@@ -58,10 +58,27 @@ object LockScreenController {
 
     /** Add the lock overlay (idempotent). Requires the "Display over other apps" permission. */
     fun show(context: Context) {
-        main.post {
-            if (overlay != null) return@post
-            if (!Settings.canDrawOverlays(context)) return@post
-            val wm = context.getSystemService(WindowManager::class.java) ?: return@post
+        main.post { if (overlay == null) addOverlay(context) }
+    }
+
+    /**
+     * Remove and re-add the overlay so it is guaranteed to be on top and focused again. Called after
+     * the screen turns on / the phone is unlocked, which is when some OEMs let the overlay slip behind.
+     */
+    fun forceReshow(context: Context) {
+        main.post { removeOverlay(context); addOverlay(context) }
+    }
+
+    /** Remove the lock overlay (idempotent). */
+    fun hide(context: Context) {
+        main.post { removeOverlay(context) }
+    }
+
+    private fun addOverlay(context: Context) {
+        run {
+            if (overlay != null) return
+            if (!Settings.canDrawOverlays(context)) return
+            val wm = context.getSystemService(WindowManager::class.java) ?: return
 
             val host = OverlayLifecycleHost().apply { create() }
             val composeView = ComposeView(context).apply {
@@ -111,16 +128,13 @@ object LockScreenController {
         }
     }
 
-    /** Remove the lock overlay (idempotent). */
-    fun hide(context: Context) {
-        main.post {
-            val v = overlay ?: return@post
-            val wm = context.getSystemService(WindowManager::class.java)
-            runCatching { wm?.removeView(v) }
-            lifecycleHost?.destroy()
-            lifecycleHost = null
-            overlay = null
-        }
+    private fun removeOverlay(context: Context) {
+        val v = overlay ?: return
+        val wm = context.getSystemService(WindowManager::class.java)
+        runCatching { wm?.removeView(v) }
+        lifecycleHost?.destroy()
+        lifecycleHost = null
+        overlay = null
     }
 
     /**

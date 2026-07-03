@@ -40,7 +40,12 @@ fun PaymentSheetContent(
     onPhoneChange: (String) -> Unit,
     onSendRequest: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    editableAmount: Boolean = false,     // flexible plan → user types the amount
+    amountText: String = "",
+    minAmount: Int = 0,
+    amountError: String? = null,
+    onAmountChange: (String) -> Unit = {}
 ) {
     Card(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -87,29 +92,51 @@ fun PaymentSheetContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Amount Display Panel
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "SAVINGS AMOUNT DUE",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 1.5.sp
+                    if (editableAmount) {
+                        // Flexible plan: the amount box is BLANK — the user enters how much to pay,
+                        // but not less than the minimum they set.
+                        OutlinedTextField(
+                            value = amountText,
+                            onValueChange = onAmountChange,
+                            label = { Text("Amount to pay (KES)") },
+                            placeholder = { Text("Minimum $minAmount") },
+                            isError = amountError != null,
+                            supportingText = { Text(amountError ?: "You can pay more, but not less than KES $minAmount") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("pay_amount_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = SaveLockPrimary,
+                                errorBorderColor = SaveLockRed
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = amount,
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = SaveLockPrimary,
-                                fontWeight = FontWeight.Black
-                            )
+                        )
+                    } else {
+                        // Amount Display Panel (fixed plan)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "SAVINGS AMOUNT DUE",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    letterSpacing = 1.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = amount,
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    color = SaveLockPrimary,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
                         }
                     }
 

@@ -178,7 +178,12 @@ fun DashboardScreen(
                     phoneError = uiState.paymentPhoneError,
                     onPhoneChange = { viewModel.updateMpesaNumber(it) },
                     onSendRequest = { viewModel.triggerPayment() },
-                    onDismiss = { isSheetOpen = false; viewModel.resetPaymentState() }
+                    onDismiss = { isSheetOpen = false; viewModel.resetPaymentState() },
+                    editableAmount = uiState.payIsFlexible,
+                    amountText = uiState.payAmountText,
+                    minAmount = uiState.payMinAmount,
+                    amountError = uiState.paymentAmountError,
+                    onAmountChange = { viewModel.updatePayAmount(it) }
                 )
             }
         }

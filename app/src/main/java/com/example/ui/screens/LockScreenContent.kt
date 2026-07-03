@@ -93,7 +93,12 @@ fun LockScreenContent(
                     onDismiss = {
                         dashboardViewModel.resetPaymentState()
                         panel = Panel.Main
-                    }
+                    },
+                    editableAmount = dash.payIsFlexible,
+                    amountText = dash.payAmountText,
+                    minAmount = dash.payMinAmount,
+                    amountError = dash.paymentAmountError,
+                    onAmountChange = { dashboardViewModel.updatePayAmount(it) }
                 )
             }
 

@@ -1,38 +1,77 @@
 package com.example.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import com.example.data.local.entity.LockMode
 import com.example.di.ServiceLocator
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * The enforcement brain. It watches which app is in the foreground and, while the lock is active,
- * puts SaveLock's full-screen accessibility overlay on top (via [LockScreenController]).
+ * keeps SaveLock's full-screen overlay on top (via [LockScreenController]).
  *
- * WHY THIS IS STRONG: the overlay is a `TYPE_ACCESSIBILITY_OVERLAY` window that floats above the
- * launcher, recents, the status/nav bars and system dialogs, and it is focusable so it swallows the
- * Back key. In FULL_LOCKDOWN it stays up the entire time the lock is active, so Home / Recents / Back
- * cannot reveal anything. In CHOSEN_APPS it appears only over the apps the user picked.
+ * WHY THIS IS STRONG:
+ *  - the overlay is a focusable `TYPE_APPLICATION_OVERLAY` that stays above the launcher/recents and
+ *    swallows Back, so Home / Recents / Back can't reveal what's behind it;
+ *  - it re-asserts on EVERY foreground change, on screen-on / unlock (the power-button timing gap),
+ *    and on a short safety ticker — so even if something briefly slips through, it re-locks instantly.
  *
- * SAFETY: this is still a soft lock — Safe Mode disables the accessibility service (removing the
- * overlay) and factory reset always wins, so SaveLock is never truly unremovable.
+ * SAFETY: still a soft lock — Safe Mode disables this service (removing the overlay) and factory reset
+ * always wins, so SaveLock is never truly unremovable.
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
 
     private var emergencyAllowed: Set<String> = emptySet()
     private var currentForeground: String = ""
     private var lockCollector: Job? = null
+    private var reassertTicker: Job? = null
+
+    // Screen on / unlock is exactly when some OEMs let an overlay slip behind — re-assert then.
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> reassert()
+            }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         emergencyAllowed = buildEmergencyAllowList()
-        // React the instant the lock turns on/off (payment, recovery code, new period, disable).
+
+        runCatching {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenReceiver, filter)
+            }
+        }
+
         if (lockCollector == null) {
             lockCollector = ServiceLocator.appScope.launch {
                 ServiceLocator.lockStateManager.lockActive.collect { updateOverlay() }
+            }
+        }
+        // Safety net: if the overlay ever gets removed while it should be up (OEM kill, race), re-add it.
+        if (reassertTicker == null) {
+            reassertTicker = ServiceLocator.appScope.launch {
+                while (true) {
+                    delay(1500)
+                    if (shouldShowNow()) LockScreenController.show(this@AppBlockerAccessibilityService)
+                }
             }
         }
     }
@@ -48,16 +87,18 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() { /* no-op */ }
 
-    override fun onUnbind(intent: android.content.Intent?): Boolean {
+    override fun onUnbind(intent: Intent?): Boolean {
         lockCollector?.cancel(); lockCollector = null
+        reassertTicker?.cancel(); reassertTicker = null
+        runCatching { unregisterReceiver(screenReceiver) }
         LockScreenController.hide(this)
         return super.onUnbind(intent)
     }
 
-    /** Decide whether the lock overlay should be up right now, and add/remove it accordingly. */
-    private fun updateOverlay() {
+    /** Should the lock overlay be up right now? */
+    private fun shouldShowNow(): Boolean {
         val lock = ServiceLocator.lockStateManager
-        val shouldShow = lock.isLockActiveNow() && when (lock.lockMode()) {
+        return lock.isLockActiveNow() && when (lock.lockMode()) {
             // Full lockdown: cover the phone the entire time the lock is active.
             LockMode.FULL_LOCKDOWN -> true
             // Chosen apps: cover only while one of the user's picked apps is in front.
@@ -65,7 +106,16 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 currentForeground !in emergencyAllowed &&
                 lock.shouldBlockDistractionPackage(currentForeground)
         }
-        if (shouldShow) LockScreenController.show(this) else LockScreenController.hide(this)
+    }
+
+    /** Add or remove the overlay to match [shouldShowNow]. */
+    private fun updateOverlay() {
+        if (shouldShowNow()) LockScreenController.show(this) else LockScreenController.hide(this)
+    }
+
+    /** Like [updateOverlay] but forces a fresh window on top (used after screen-on / unlock). */
+    private fun reassert() {
+        if (shouldShowNow()) LockScreenController.forceReshow(this) else LockScreenController.hide(this)
     }
 
     /**

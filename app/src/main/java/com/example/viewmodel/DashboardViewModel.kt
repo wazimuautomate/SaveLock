@@ -1,6 +1,5 @@
 package com.example.viewmodel
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.AmountType
@@ -45,7 +44,9 @@ data class PlanRow(
     val statusLabel: String,     // "Pay now to unlock" / "Paid this period" / "Goal complete"
     val isLocking: Boolean,
     val isComplete: Boolean,
-    val payAmount: Int           // charge for "Save now" (period shortfall, or the full amount)
+    val payAmount: Int,          // charge for "Save now" (period shortfall, or the full amount)
+    val isFlexible: Boolean,     // true = user types the amount (>= minAmount)
+    val minAmount: Int           // per-period minimum (the amount the user set)
 )
 
 data class DashboardUiState(
@@ -60,17 +61,21 @@ data class DashboardUiState(
     val payTargetName: String? = null,
     val mpesaNumber: String = "",
     val chargeAmount: String = "KES 0",
+    val payIsFlexible: Boolean = false,      // flexible plan → the amount field is editable
+    val payMinAmount: Int = 0,               // minimum for a flexible payment
+    val payAmountText: String = "",          // what the user typed (flexible only)
     val paymentStatus: PaymentStatus = PaymentStatus.Idle,
-    val paymentPhoneError: String? = null
+    val paymentPhoneError: String? = null,
+    val paymentAmountError: String? = null
 )
 
 /**
  * Home + payment, backed by Room. The plan list, totals and lock status come from the repository;
  * the payment sheet and the disable-confirmation dialog are transient UI state.
  *
- * Payment uses the real Supabase backend when configured (app/savelock.properties filled in);
- * otherwise it falls back to a local demo flow so the app is usable before backend setup. Either
- * way a success records a real plan payment so progress bars and the lock update end-to-end.
+ * Payment is REAL — it calls the Supabase backend (STK Push) when configured (app/savelock.properties
+ * filled in, injected in CI from GitHub secrets). If the backend isn't configured, payment fails with
+ * a clear message rather than pretending to succeed. A confirmed payment records a real plan payment.
  */
 class DashboardViewModel(
     private val repository: SaveLockRepository,
@@ -82,6 +87,8 @@ class DashboardViewModel(
         val targetPlanId: Long? = null,
         val phoneText: String? = null,           // in-progress edit; null => persisted mpesa number
         val phoneError: String? = null,
+        val amountText: String? = null,          // flexible-plan amount the user typed
+        val amountError: String? = null,
         val showDisablingConfirmation: Boolean = false
     )
 
@@ -117,8 +124,12 @@ class DashboardViewModel(
                 payTargetName = target?.name,
                 mpesaNumber = pay.phoneText ?: cfg.mpesaNumber,
                 chargeAmount = "KES %,d".format(target?.payAmount ?: 0),
+                payIsFlexible = target?.isFlexible == true,
+                payMinAmount = target?.minAmount ?: 0,
+                payAmountText = pay.amountText ?: "",
                 paymentStatus = pay.paymentStatus,
-                paymentPhoneError = pay.phoneError
+                paymentPhoneError = pay.phoneError,
+                paymentAmountError = pay.amountError
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardUiState())
 
@@ -162,7 +173,9 @@ class DashboardViewModel(
             statusLabel = status,
             isLocking = locking,
             isComplete = complete,
-            payAmount = payAmount
+            payAmount = payAmount,
+            isFlexible = plan.amountType == AmountType.FLEXIBLE,
+            minAmount = required
         )
     }
 
@@ -258,9 +271,11 @@ class DashboardViewModel(
 
     // ---- Payment ---------------------------------------------------------------------------------
 
-    /** Open the payment sheet aimed at a specific plan. */
+    /** Open the payment sheet aimed at a specific plan. Clears any prior amount entry. */
     fun openPaymentForPlan(planId: Long) {
-        payState.update { it.copy(targetPlanId = planId, paymentStatus = PaymentStatus.Idle) }
+        payState.update {
+            it.copy(targetPlanId = planId, paymentStatus = PaymentStatus.Idle, amountText = null, amountError = null)
+        }
     }
 
     fun updateMpesaNumber(number: String) {
@@ -271,10 +286,17 @@ class DashboardViewModel(
         }
     }
 
+    /** For a flexible plan: the amount the user types (digits only). Validated on submit. */
+    fun updatePayAmount(text: String) {
+        payState.update { it.copy(amountText = text.filter { c -> c.isDigit() }, amountError = null) }
+    }
+
     fun triggerPayment() {
         viewModelScope.launch {
             val planId = payState.value.targetPlanId ?: return@launch
+            val plan = repository.getPlan(planId) ?: return@launch
             val cfg = repository.getConfig()
+
             val raw = payState.value.phoneText ?: cfg.mpesaNumber
             val phone = PhoneUtils.normalize(raw)
             if (phone == null) {
@@ -283,13 +305,32 @@ class DashboardViewModel(
             }
             payState.update { it.copy(phoneError = null) }
 
-            val amount = repository.amountDueNow(planId)
-            val reference = if (repository.getPlan(planId)?.type == PlanType.GOAL) "goal" else "save"
+            // Fixed plan: charge the period shortfall. Flexible: the user types the amount (>= minimum).
+            val amount: Int = if (plan.amountType == AmountType.FLEXIBLE) {
+                val minimum = PlanLogic.requiredAmount(plan)
+                val entered = payState.value.amountText?.toIntOrNull()
+                if (entered == null || entered < minimum) {
+                    payState.update { it.copy(amountError = "Enter at least KES %,d".format(minimum)) }
+                    return@launch
+                }
+                entered
+            } else {
+                repository.amountDueNow(planId)
+            }
+            payState.update { it.copy(amountError = null) }
+
+            val reference = if (plan.type == PlanType.GOAL) "goal" else "save"
             val backend = paymentRepository
             if (backend != null) {
                 realPayment(backend, phone, amount, reference, planId)
             } else {
-                demoPayment(amount, planId)
+                // No backend configured — do NOT fake a success. Tell the user plainly.
+                payState.update {
+                    it.copy(paymentStatus = PaymentStatus.Failed(
+                        "M-Pesa isn't set up yet on this build. The backend (Supabase + Daraja) must be " +
+                            "connected first. Use a recovery code to unlock for now."
+                    ))
+                }
             }
         }
     }
@@ -312,16 +353,6 @@ class DashboardViewModel(
             PaymentRepository.PayResult.Timeout ->
                 payState.update { it.copy(paymentStatus = PaymentStatus.Timeout) }
         }
-    }
-
-    /** Local demo flow used only until the Supabase backend is configured. */
-    private suspend fun demoPayment(amount: Int, planId: Long) {
-        Log.d("DashboardVM", "Backend not configured — running demo payment flow")
-        payState.update { it.copy(paymentStatus = PaymentStatus.Requesting) }
-        delay(1500)
-        payState.update { it.copy(paymentStatus = PaymentStatus.WaitingForSTK) }
-        delay(2500)
-        onPaymentSucceeded(planId, amount)
     }
 
     private suspend fun onPaymentSucceeded(planId: Long, amount: Int) {

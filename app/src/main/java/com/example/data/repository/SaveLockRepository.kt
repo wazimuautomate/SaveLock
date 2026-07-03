@@ -57,10 +57,12 @@ class SaveLockRepository(
     /** Edit an existing plan (keeps its id, createdAt anchor and payments). */
     suspend fun updatePlan(plan: SavingsPlanEntity) = planDao.update(plan)
 
-    /** Stop a plan and forget its payments (used for delete/complete). */
+    /**
+     * Stop a plan (deactivate). We KEEP its payments so the History screen still shows what was
+     * saved — the plan row stays (inactive) purely so history can still show its name.
+     */
     suspend fun deletePlan(id: Long) {
         planDao.deactivate(id)
-        planPaymentDao.deleteForPlan(id)
     }
 
     /**
