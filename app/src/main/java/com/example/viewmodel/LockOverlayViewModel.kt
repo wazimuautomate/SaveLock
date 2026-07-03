@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 data class LockOverlayUiState(
     val amountDue: String = "KES 500",
     val deadlinePassed: Boolean = true,
+    val fullLockdown: Boolean = false,
     val bannerMessage: String =
         "Your distraction apps are locked out. Complete your daily savings target or enter a recovery code to regain access immediately."
 )
@@ -28,6 +29,7 @@ class LockOverlayViewModel(private val repository: SaveLockRepository) : ViewMod
             LockOverlayUiState(
                 amountDue = "KES %,d".format(cfg.dailyAmount),
                 deadlinePassed = !resolved,
+                fullLockdown = cfg.lockMode == LockMode.FULL_LOCKDOWN,
                 bannerMessage = when (cfg.lockMode) {
                     LockMode.FULL_LOCKDOWN ->
                         "Full lockdown is active. Only phone calls and messages are available. " +

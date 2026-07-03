@@ -8,8 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
@@ -37,7 +39,9 @@ fun OverlayScreen(
     viewModel: LockOverlayViewModel,
     dashboardViewModel: DashboardViewModel,
     onNavigateToRecoveryEntry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenDialer: () -> Unit = {},
+    onOpenMessages: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dashboardUiState by dashboardViewModel.uiState.collectAsState()
@@ -195,6 +199,39 @@ fun OverlayScreen(
                         fontWeight = FontWeight.Bold,
                         color = SaveLockAmber
                     )
+                }
+            }
+
+            // In full lockdown the home screen is blocked, so offer direct Call / Messages access here.
+            // (Emergency calling must always be reachable.)
+            if (uiState.fullLockdown) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenDialer,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("overlay_call_button")
+                    ) {
+                        Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Call")
+                    }
+                    OutlinedButton(
+                        onClick = onOpenMessages,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("overlay_messages_button")
+                    ) {
+                        Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Messages")
+                    }
                 }
             }
 

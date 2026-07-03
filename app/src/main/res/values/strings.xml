@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SaveLock</string>
+    <string name="accessibility_description">SaveLock uses this to notice when you open a distraction app after your daily deadline, so it can show the lock screen. It never reads your screen content, and it never blocks phone calls or messages.</string>
 </resources>
