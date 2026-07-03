@@ -89,6 +89,41 @@ class SaveLockRepository(
         )
     }
 
+    /**
+     * Credit an externally-confirmed real payment (from the M-Pesa confirmation SMS or the C2B
+     * webhook) toward whichever plans are currently locking. The [receipt] (M-Pesa code / TransID)
+     * dedups it so the same payment is never counted twice — safe to call from both the SMS receiver
+     * and the online reconcile poller for the same transaction.
+     *
+     * The amount is spread across due plans (oldest first), each getting up to its current-period
+     * shortfall, until the money runs out. Returns true if it credited at least one plan (which will
+     * lift the lock via the payments Flow). Fully local — no network.
+     */
+    suspend fun applyExternalPayment(receipt: String, amount: Int): Boolean {
+        if (receipt.isBlank() || amount <= 0) return false
+        if (planPaymentDao.countByReceipt(receipt) > 0) return false // already processed this code
+        val now = System.currentTimeMillis()
+        var remaining = amount
+        var creditedAny = false
+        for (plan in planDao.getActive()) {
+            if (remaining <= 0) break
+            val payments = planPaymentDao.getForPlan(plan.id)
+            if (PlanLogic.isGoalCompleted(plan, payments, now)) continue
+            val idx = PlanLogic.currentPeriodIndex(plan, now)
+            val paid = payments.filter { it.periodIndex == idx }.sumOf { it.amount }
+            val shortfall = PlanLogic.requiredAmount(plan) - paid
+            if (shortfall <= 0) continue
+            val credit = minOf(shortfall, remaining)
+            recordPlanPayment(plan.id, credit, checkoutRequestId = receipt, viaRecovery = false)
+            remaining -= credit
+            creditedAny = true
+        }
+        // Mirror the STK-success path: crediting the plan payment(s) is what lifts the lock (via the
+        // payments Flow). We deliberately do NOT touch the legacy daily log here, so streak/history
+        // stay consistent regardless of whether a payment arrived via STK, SMS or C2B.
+        return creditedAny
+    }
+
     /** How much is still owed for [planId]'s CURRENT period (what "Save now" should charge). */
     suspend fun amountDueNow(planId: Long): Int {
         val plan = planDao.getById(planId) ?: return 0
@@ -124,6 +159,8 @@ class SaveLockRepository(
         updateConfig { it.copy(lockMode = mode) }
     suspend fun setMpesaNumber(number: String) = updateConfig { it.copy(mpesaNumber = number) }
     suspend fun setSavingEnabled(enabled: Boolean) = updateConfig { it.copy(savingEnabled = enabled) }
+    suspend fun setTillName(name: String) = updateConfig { it.copy(tillName = name.trim()) }
+    suspend fun setSmsAutoUnlock(enabled: Boolean) = updateConfig { it.copy(smsAutoUnlockEnabled = enabled) }
 
     suspend fun addReminderLeadHour(hours: Int) = updateConfig {
         if (hours in 1..23 && hours !in it.reminderLeadHours) {

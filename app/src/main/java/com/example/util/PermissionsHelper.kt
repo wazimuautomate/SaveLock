@@ -1,14 +1,17 @@
 package com.example.util
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.admin.SaveLockDeviceAdminReceiver
 import com.example.service.AppBlockerAccessibilityService
 
@@ -30,6 +33,11 @@ object PermissionsHelper {
     }
 
     fun isOverlayGranted(context: Context): Boolean = Settings.canDrawOverlays(context)
+
+    /** RECEIVE_SMS — needed to read the M-Pesa confirmation SMS for offline auto-unlock. */
+    fun isSmsPermissionGranted(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) ==
+            PackageManager.PERMISSION_GRANTED
 
     fun isNotificationsEnabled(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()

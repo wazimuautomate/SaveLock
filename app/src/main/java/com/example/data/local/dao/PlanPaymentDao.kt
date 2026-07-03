@@ -21,6 +21,10 @@ interface PlanPaymentDao {
     @Query("SELECT COALESCE(SUM(amount), 0) FROM plan_payment WHERE planId = :planId AND periodIndex = :periodIndex")
     suspend fun sumForPeriod(planId: Long, periodIndex: Long): Int
 
+    /** How many rows already reference this external receipt / M-Pesa code (dedup for SMS & C2B). */
+    @Query("SELECT COUNT(*) FROM plan_payment WHERE checkoutRequestId = :receipt")
+    suspend fun countByReceipt(receipt: String): Int
+
     @Insert
     suspend fun insert(payment: PlanPaymentEntity)
 

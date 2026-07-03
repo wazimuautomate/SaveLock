@@ -11,3 +11,17 @@ verify_jwt = false
 
 [functions.stk-status]
 verify_jwt = false
+
+# C2B (offline direct-till payments): validation + confirmation are called by Safaricom (no JWT);
+# register + till-payments are called by the app with our x-app-key header (no JWT).
+[functions.c2b-validation]
+verify_jwt = false
+
+[functions.c2b-confirmation]
+verify_jwt = false
+
+[functions.c2b-register]
+verify_jwt = false
+
+[functions.till-payments]
+verify_jwt = false

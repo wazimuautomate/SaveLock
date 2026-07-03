@@ -74,7 +74,7 @@ See [`.env.example`](.env.example). Summary:
 | `DARAJA_PASSKEY` | Lipa na M-Pesa Online passkey. |
 | `DARAJA_SHORTCODE` | Head-office/store short code, used only to build the Lipa na M-Pesa password. |
 | `TILL_NUMBER` | The Till (Buy Goods) number the money actually lands in (`PartyB`). |
-| `DARAJA_ENV` | `sandbox` while testing, `production` when live. |
+| `DARAJA_ENV` | `sandbox` while testing, **`production` when live**. ⚠️ If this is `sandbox` (or unset), the STK push goes to Safaricom's sandbox and **never prompts a real phone/till** — the app just times out. For real payments this MUST be `production` with your production/Go-Live keys, passkey and shortcode. |
 | `DARAJA_TX_TYPE` | `CustomerBuyGoodsOnline` (till, default) or `CustomerPayBillOnline` (paybill). |
 | `DARAJA_CALLBACK_URL` | The `/stk-callback` URL above. |
 | `APP_BACKEND_KEY` | Shared secret; must match `app/savelock.properties`. |
@@ -106,3 +106,28 @@ You should get back a `checkoutRequestId` and a prompt on the test phone. Then:
 curl https://YOUR-PROJECT-REF.functions.supabase.co/stk-status/<checkoutRequestId> \
   -H "x-app-key: YOUR_APP_BACKEND_KEY"
 ```
+
+---
+
+## Offline / low-data payments (C2B — pay the till directly)
+
+STK push needs the phone online. To also catch payments a customer makes **directly** to the till
+from the M-Pesa menu (works on GSM with no mobile data), register the C2B webhooks **once**:
+
+```bash
+curl -X POST https://YOUR-PROJECT-REF.functions.supabase.co/c2b-register \
+  -H "x-app-key: YOUR_APP_BACKEND_KEY"
+```
+A successful response contains `"ResponseDescription":"success"`. This points Safaricom at:
+```
+Confirmation: https://YOUR-PROJECT-REF.functions.supabase.co/c2b-confirmation
+Validation:   https://YOUR-PROJECT-REF.functions.supabase.co/c2b-validation
+```
+After that, every direct till payment is stored in `till_payments`, and the app polls
+`/till-payments` (while locked, when online) to reconcile and unlock. Requires production Go-Live
+creds — sandbox shortcodes cannot register live C2B URLs. On-device, the app **also** reads the
+M-Pesa confirmation SMS to unlock with no internet at all (Settings → Offline M-Pesa Unlock).
+
+> Deploy note: deploy the four new functions too —
+> `supabase functions deploy c2b-validation c2b-confirmation c2b-register till-payments`
+> and run the new migration (`supabase db push`).

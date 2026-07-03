@@ -26,3 +26,18 @@ data class StkStatusResponse(
     val amount: Int? = null,
     val resultDesc: String? = null
 )
+
+/** Response from GET /till-payments — direct Till/Paybill (C2B) payments the backend has recorded. */
+@JsonClass(generateAdapter = true)
+data class TillPaymentsResponse(
+    val payments: List<TillPaymentDto> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class TillPaymentDto(
+    val transId: String,
+    val amount: Double? = null,
+    val msisdn: String? = null,
+    val billRef: String? = null,
+    val createdAt: String? = null
+)

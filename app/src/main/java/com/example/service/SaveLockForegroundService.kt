@@ -11,6 +11,7 @@ import com.example.data.local.entity.LockMode
 import com.example.di.ServiceLocator
 import com.example.util.NotificationManagerHelper
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -25,6 +26,7 @@ import kotlinx.coroutines.launch
 class SaveLockForegroundService : Service() {
 
     private var observeJob: Job? = null
+    private var reconcileJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -48,6 +50,28 @@ class SaveLockForegroundService : Service() {
                 }
             }
         }
+
+        // While locked and online, reconcile any direct-till (C2B) payment the phone missed offline,
+        // so paying the till from another device / with no app data still lifts the lock once online.
+        if (reconcileJob == null) {
+            val backend = ServiceLocator.paymentRepository
+            if (backend != null) {
+                reconcileJob = ServiceLocator.appScope.launch {
+                    while (true) {
+                        if (ServiceLocator.lockStateManager.isLockActiveNow()) {
+                            var creditedAny = false
+                            for (p in backend.recentTillPayments()) {
+                                if (ServiceLocator.repository.applyExternalPayment(p.transId, p.amount)) {
+                                    creditedAny = true
+                                }
+                            }
+                            if (creditedAny) ServiceLocator.lockStateManager.recompute()
+                        }
+                        delay(20_000)
+                    }
+                }
+            }
+        }
         return START_STICKY
     }
 
@@ -66,6 +90,8 @@ class SaveLockForegroundService : Service() {
     override fun onDestroy() {
         observeJob?.cancel()
         observeJob = null
+        reconcileJob?.cancel()
+        reconcileJob = null
         ShadeGuard.hide(applicationContext)
         super.onDestroy()
     }

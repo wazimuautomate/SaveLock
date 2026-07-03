@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.local.dao.PlanPaymentDao
 import com.example.data.local.dao.RecoveryCodeDao
 import com.example.data.local.dao.SavingsConfigDao
@@ -24,7 +26,7 @@ import com.example.data.local.entity.SavingsPlanEntity
         SavingsPlanEntity::class,
         PlanPaymentEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,6 +42,17 @@ abstract class SaveLockDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: SaveLockDatabase? = null
 
+        /**
+         * v3 → v4: adds the two SMS-auto-unlock columns to savings_config. Written as a real
+         * migration (not a destructive wipe) so the user keeps their plans, payments and setup.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE savings_config ADD COLUMN tillName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE savings_config ADD COLUMN smsAutoUnlockEnabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(context: Context): SaveLockDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -47,8 +60,9 @@ abstract class SaveLockDatabase : RoomDatabase() {
                     SaveLockDatabase::class.java,
                     "savelock.db"
                 )
-                    // Personal app, single user: a destructive fallback is acceptable if we ever
-                    // bump the schema version without writing a migration.
+                    .addMigrations(MIGRATION_3_4)
+                    // Personal app, single user: destructive fallback stays as a backstop only if we
+                    // ever bump the version WITHOUT providing a migration above.
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
