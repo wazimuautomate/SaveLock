@@ -7,6 +7,21 @@ This project uses date-based entries (personal, non-versioned build).
 ## [Unreleased]
 
 ### Added
+- **Savings & Goals plans** — run many at once, side by side. A **Savings** plan repeats forever
+  (save a set amount every period); a **Goal** works toward a target total. The Home screen now
+  lists each plan with a live progress bar, its status, a Save/Pay button, and a delete option.
+- **Create Savings/Goal screen**: pick an exact amount or a minimum, and a schedule of Daily,
+  Every 2 days, Weekly, Monthly, Every N days, or Every N hours. Goals also take a target total
+  and an optional deadline.
+- The lock screen now shows every plan that is due, each with its own "Pay & unlock" button.
+
+### Changed
+- The phone now locks whenever **any** plan is due-and-unpaid for its current period, and unlocks
+  when every due plan is paid (or a recovery code is used). Plans share one lock.
+- A recovery code now clears the current period of **all** due plans at once (still fully offline).
+- Removed the old single "daily lock time" and lead-time reminder settings — timing is now per plan.
+
+### Added (earlier)
 - Project documentation: `CLAUDE.md` (rules + full project map), `memory.md` (running work log),
   this `CHANGELOG.md`, and a rewritten `README.md`.
 - Git repository initialized with `main` + `feature` branches and the GitHub remote

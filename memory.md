@@ -11,6 +11,43 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 3: Savings & Goals Stage 2 (CI GREEN, commit f519016)
+
+Owner said "keep going straight through Stage 2, build everything quickly." Done end-to-end and
+verified on CI (APK built + uploaded; the KSP2 AWT `X` annotation is the known non-fatal quirk).
+
+Shipped:
+- ✅ **Repository plan methods**: `activePlans`, `allPayments`, `planTotalSaved` Flows; `createPlan`,
+  `deletePlan`, `recordPlanPayment` (computes periodIndex via PlanLogic), `amountDueNow(planId)`.
+- ✅ **`LockStateManager` rewired to plans**: locks when ANY active plan is due-and-unpaid this period
+  (`PlanLogic.isLockingNow`). Dropped global lockTime/todayResolved. Added a 60s ticker so periods
+  flip the lock on time. Lock mode + restricted packages still come from config.
+- ✅ **Recovery redeem = per-plan**: `redeemRecoveryCode` now clears the CURRENT period of every due
+  plan (logs the shortfall as a `viaRecovery` payment, no money). Still fully offline.
+- ✅ **DashboardViewModel = Home + payment**: exposes `PlanRow`s (progress, status, payAmount) +
+  `openPaymentForPlan`/`triggerPayment` (targets one plan) + `createPlan`/`deletePlan`. Total saved =
+  sum of real (non-recovery) plan payments.
+- ✅ **New Home** (`DashboardScreen`): total-saved banner, per-plan cards (progress bar + status +
+  Save/Pay button + delete), empty state, "New" → Create. Removed old single daily-target card.
+- ✅ **New `CreatePlanScreen`** + route: Savings/Goal toggle, name, amount (exact or minimum), period
+  (Daily / Every 2 days / Weekly / Monthly / Every N days / Every N hours), goal target + optional
+  deadline days. Validates before enabling Create.
+- ✅ **Lock overlay** now lists the due plans, each with its own "Pay KES x & unlock" button; recovery
+  + emergency retained.
+- ✅ **AlarmScheduler** arms at the earliest upcoming plan period boundary; `Boot`/`LockCheck` receivers
+  re-arm from plans. `SaveLockApplication` re-arms on plan-set / enabled changes.
+- ✅ **Settings trimmed**: removed the lock-time "trigger clock" + lead-time reminder UI (obsolete).
+  Lock strictness, distraction apps, recovery, theme, permissions cards unchanged.
+
+Notes / follow-ups (⏳ optional, not blocking):
+- History screen still reads the old `SavingsLog` table (recovery marks a log). Plan payments don't
+  appear there yet — could add a plan-payment history later if the owner wants it.
+- `SavingsLog`/`dailyAmount`/`lockTime`/`ReminderWorker`/`DateUtils` lock-time helpers remain as
+  dead-but-compiling legacy; safe to prune in a cleanup pass.
+- DB is v3 with destructive fallback — installing this build wipes any earlier local data (fine, single user).
+
+---
+
 ## 2026-07-03 — Session 2: Feedback round 2 (CI green, commit 7a8389a)
 
 Urgent fixes from owner testing:
