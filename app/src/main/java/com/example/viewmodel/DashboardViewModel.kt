@@ -4,7 +4,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.SavingsStatus
+import com.example.data.remote.PaymentRepository
 import com.example.data.repository.SaveLockRepository
+import com.example.di.ServiceLocator
+import com.example.scheduling.AlarmScheduler
+import com.example.util.NotificationManagerHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,11 +50,14 @@ data class DashboardUiState(
  * Dashboard backed by Room. Balance/streak/target/saved-today come from the repository; payment and
  * the disable-confirmation dialog are transient UI state.
  *
- * NOTE: [triggerPayment] is TEMPORARILY simulated until the Supabase STK-push wiring (task 10)
- * replaces its body. On a simulated success it already writes a real SavingsLog so streaks/history
- * update for real end-to-end.
+ * Payment uses the real Supabase backend when it is configured (app/savelock.properties filled in);
+ * otherwise it falls back to a local demo flow so the app is still usable before backend setup.
+ * Either way, a success writes a real SavingsLog so streaks/history update end-to-end.
  */
-class DashboardViewModel(private val repository: SaveLockRepository) : ViewModel() {
+class DashboardViewModel(
+    private val repository: SaveLockRepository,
+    private val paymentRepository: PaymentRepository? = null
+) : ViewModel() {
 
     private data class PayState(
         val paymentStatus: PaymentStatus = PaymentStatus.Idle,
@@ -119,27 +126,48 @@ class DashboardViewModel(private val repository: SaveLockRepository) : ViewModel
                 payState.update { it.copy(phoneError = "Format must be 2547XXXXXXXX") }
                 return@launch
             }
+            payState.update { it.copy(phoneError = null) }
 
-            // ---- TEMPORARY simulation (replaced by real Supabase STK push in task 10) ----
-            Log.d("DashboardVM", "Simulating STK push for $phone")
-            payState.update { it.copy(paymentStatus = PaymentStatus.Requesting) }
-            delay(1500)
-            payState.update { it.copy(paymentStatus = PaymentStatus.WaitingForSTK) }
-            delay(2500)
-
-            val success = kotlin.random.Random.nextDouble() > 0.3
-            if (success) {
-                repository.markSavedToday(savedAmount = cfg.dailyAmount, checkoutRequestId = null)
-                payState.update { it.copy(paymentStatus = PaymentStatus.Success) }
+            val backend = paymentRepository
+            if (backend != null) {
+                realPayment(backend, phone, cfg.dailyAmount)
             } else {
-                if (kotlin.random.Random.nextBoolean()) {
-                    payState.update { it.copy(paymentStatus = PaymentStatus.Failed("Transaction cancelled by user")) }
-                } else {
-                    payState.update { it.copy(paymentStatus = PaymentStatus.Timeout) }
-                }
+                demoPayment(cfg.dailyAmount)
             }
-            // ---- end simulation ----
         }
+    }
+
+    private suspend fun realPayment(backend: PaymentRepository, phone: String, amount: Int) {
+        payState.update { it.copy(paymentStatus = PaymentStatus.Requesting) }
+        val result = backend.pay(phone, amount, onStkSent = {
+            payState.update { it.copy(paymentStatus = PaymentStatus.WaitingForSTK) }
+        })
+        when (result) {
+            is PaymentRepository.PayResult.Success -> onPaymentSucceeded(result.amount)
+            is PaymentRepository.PayResult.Failed ->
+                payState.update { it.copy(paymentStatus = PaymentStatus.Failed(result.message)) }
+            PaymentRepository.PayResult.Timeout ->
+                payState.update { it.copy(paymentStatus = PaymentStatus.Timeout) }
+        }
+    }
+
+    /** Local demo flow used only until the Supabase backend is configured. */
+    private suspend fun demoPayment(amount: Int) {
+        Log.d("DashboardVM", "Backend not configured — running demo payment flow")
+        payState.update { it.copy(paymentStatus = PaymentStatus.Requesting) }
+        delay(1500)
+        payState.update { it.copy(paymentStatus = PaymentStatus.WaitingForSTK) }
+        delay(2500)
+        onPaymentSucceeded(amount)
+    }
+
+    private suspend fun onPaymentSucceeded(amount: Int) {
+        repository.markSavedToday(savedAmount = amount, checkoutRequestId = null)
+        val ctx = ServiceLocator.applicationContext
+        NotificationManagerHelper.showPaymentResult(ctx, success = true, amount = amount)
+        NotificationManagerHelper.clearLockActive(ctx)
+        AlarmScheduler.cancelReminders(ctx) // no more nudges today
+        payState.update { it.copy(paymentStatus = PaymentStatus.Success) }
     }
 
     fun resetPaymentState() {

@@ -11,7 +11,7 @@ import com.example.di.ServiceLocator
  */
 object SaveLockViewModels {
     val Factory: ViewModelProvider.Factory = viewModelFactory {
-        initializer { DashboardViewModel(ServiceLocator.repository) }
+        initializer { DashboardViewModel(ServiceLocator.repository, ServiceLocator.paymentRepository) }
         initializer { SettingsViewModel(ServiceLocator.repository) }
         initializer { HistoryViewModel(ServiceLocator.repository) }
         initializer { RecoveryViewModel(ServiceLocator.repository) }

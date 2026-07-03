@@ -106,6 +106,11 @@ object NotificationManagerHelper {
         )
     }
 
+    /** Remove the "apps locked" notification once the day is resolved. */
+    fun clearLockActive(context: Context) {
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(ID_LOCK_ACTIVE)
+    }
+
     /** Generic helper retained for the Settings test buttons. */
     fun showNotification(context: Context, channelId: String, id: Int, title: String, message: String) {
         notify(

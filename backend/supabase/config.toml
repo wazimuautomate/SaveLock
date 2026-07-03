@@ -1,0 +1,13 @@
+# Supabase local/CLI config for the SaveLock backend.
+project_id = "savelock"
+
+# Our functions authenticate with our OWN app key header (x-app-key), not a Supabase JWT,
+# so we disable JWT verification on them. The callback is called by Safaricom (no JWT either).
+[functions.stk-push]
+verify_jwt = false
+
+[functions.stk-callback]
+verify_jwt = false
+
+[functions.stk-status]
+verify_jwt = false
