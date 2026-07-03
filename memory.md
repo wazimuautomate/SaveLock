@@ -329,3 +329,15 @@ copy; app-picker for distraction apps (currently a fixed default list the user t
   NOT in local backend/supabase/migrations/ — possible drift; investigate if it matters later.
 - SECURITY: the access token was pasted into chat in plaintext → owner should **revoke/rotate it**
   in Supabase dashboard (Account → Access Tokens) now that the push is done.
+
+## Session 2026-07-03 (cont.) — Secrets + Edge Functions deployed
+- Deploy needs a Management API access token that is CURRENT (tokens get revoked/expire; a dead
+  token returns 401 on EVERY endpoint, not a clear "expired" message). Keep token alive until done.
+- No Docker on this machine → deploy functions with `--use-api` (server-side bundling):
+  `npx supabase functions deploy <slug> --use-api --project-ref kvdugtdgobtjtychifzb`.
+- Set 8 secrets via Management API `POST /v1/projects/{ref}/secrets` (CLI `secrets set` legacy path
+  threw Unauthorized): DARAJA_* , TILL_NUMBER, APP_BACKEND_KEY. SUPABASE_URL/SERVICE_ROLE_KEY are
+  auto-injected — never set them (reserved prefix).
+- All 3 functions ACTIVE, verify_jwt=false: stk-push (401 without x-app-key ✓),
+  stk-status (405 on POST, expects GET ✓), stk-callback (public, returned ResultCode 0 "Ignored" ✓).
+- Backend is now fully live: schema + secrets + functions. App can call stk-push once wired.
