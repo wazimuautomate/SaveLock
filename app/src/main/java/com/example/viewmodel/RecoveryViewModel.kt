@@ -86,7 +86,7 @@ class RecoveryViewModel(private val repository: SaveLockRepository) : ViewModel(
     }
 
     /** Generate a fresh batch, wiping old codes. The plaintext appears in [revealedCodes] once. */
-    fun generateNewCodes(count: Int = 10) {
+    fun generateNewCodes(count: Int = 3) {
         viewModelScope.launch {
             _revealedCodes.value = repository.regenerateRecoveryCodes(count)
             Log.d("RecoveryVM", "Generated $count new recovery codes (shown once).")
@@ -94,7 +94,7 @@ class RecoveryViewModel(private val repository: SaveLockRepository) : ViewModel(
     }
 
     /** Ensure codes exist the first time the list screen opens; reveals them once if newly made. */
-    fun ensureCodesExist(count: Int = 10) {
+    fun ensureCodesExist(count: Int = 3) {
         viewModelScope.launch {
             val created = repository.ensureRecoveryCodesExist(count)
             if (created != null) _revealedCodes.value = created

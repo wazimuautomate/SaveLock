@@ -185,11 +185,27 @@ class MainActivity : ComponentActivity() {
 
                         // 6. Lockout Overlay Screen (Simulated lockout view)
                         composable(Screen.LockOverlay.route) {
+                            val overlayDash by dashboardViewModel.uiState.collectAsState()
+                            // Auto-leave the (simulated) lock once a payment succeeds, like the real one.
+                            LaunchedEffect(overlayDash.paymentStatus) {
+                                if (overlayDash.paymentStatus is PaymentStatus.Success) {
+                                    kotlinx.coroutines.delay(1200)
+                                    navController.popBackStack(Screen.Dashboard.route, inclusive = false)
+                                }
+                            }
                             OverlayScreen(
                                 viewModel = lockOverlayViewModel,
                                 dashboardViewModel = dashboardViewModel,
                                 onNavigateToRecoveryEntry = {
                                     navController.navigate(Screen.RecoveryCodeEntry.route)
+                                },
+                                onOpenEmergency = {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent("com.android.phone.EmergencyDialer.DIAL")
+                                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        )
+                                    }
                                 }
                             )
                         }

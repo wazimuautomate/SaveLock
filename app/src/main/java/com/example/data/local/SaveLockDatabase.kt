@@ -5,20 +5,26 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.example.data.local.dao.PlanPaymentDao
 import com.example.data.local.dao.RecoveryCodeDao
 import com.example.data.local.dao.SavingsConfigDao
 import com.example.data.local.dao.SavingsLogDao
+import com.example.data.local.dao.SavingsPlanDao
+import com.example.data.local.entity.PlanPaymentEntity
 import com.example.data.local.entity.RecoveryCodeEntity
 import com.example.data.local.entity.SavingsConfigEntity
 import com.example.data.local.entity.SavingsLogEntity
+import com.example.data.local.entity.SavingsPlanEntity
 
 @Database(
     entities = [
         SavingsConfigEntity::class,
         SavingsLogEntity::class,
-        RecoveryCodeEntity::class
+        RecoveryCodeEntity::class,
+        SavingsPlanEntity::class,
+        PlanPaymentEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -27,6 +33,8 @@ abstract class SaveLockDatabase : RoomDatabase() {
     abstract fun configDao(): SavingsConfigDao
     abstract fun logDao(): SavingsLogDao
     abstract fun recoveryDao(): RecoveryCodeDao
+    abstract fun planDao(): SavingsPlanDao
+    abstract fun planPaymentDao(): PlanPaymentDao
 
     companion object {
         @Volatile

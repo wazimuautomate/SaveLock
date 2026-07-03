@@ -59,6 +59,9 @@ class LockOverlayActivity : ComponentActivity() {
         // Swallow the Back button — it must never dismiss the lock to reveal a blocked app.
         onBackPressedDispatcher.addCallback(this) { /* intentionally do nothing */ }
 
+        // Refresh the lock state so the "auto-close when unlocked" logic starts from a fresh value.
+        ServiceLocator.lockStateManager.recompute()
+
         setContent {
             SaveLockTheme {
                 // When the day gets resolved (paid or recovery code), the lock clears — close the screen.
@@ -82,8 +85,7 @@ class LockOverlayActivity : ComponentActivity() {
                         viewModel = lockVm,
                         dashboardViewModel = dashVm,
                         onNavigateToRecoveryEntry = { showRecovery = true },
-                        onOpenDialer = { openDialer() },
-                        onOpenMessages = { openMessages() }
+                        onOpenEmergency = { openEmergencyDialer() }
                     )
                 }
             }
@@ -98,20 +100,20 @@ class LockOverlayActivity : ComponentActivity() {
         }
     }
 
-    private fun openDialer() {
+    /**
+     * Opens the system EMERGENCY dialer (for 999/112-type calls), NOT the normal phone app.
+     * The emergency dialer is the same one reachable from the keyguard and only allows emergency
+     * numbers, so nothing else on the phone becomes accessible.
+     */
+    private fun openEmergencyDialer() {
+        val emergency = Intent("com.android.phone.EmergencyDialer.DIAL")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { startActivity(emergency) }.isSuccess) return
+        // Fallback: the normal dial screen pre-filled with an emergency number.
         runCatching {
-            startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            startActivity(
+                Intent(Intent.ACTION_DIAL, Uri.parse("tel:112")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         }
-    }
-
-    private fun openMessages() {
-        // Prefer the default SMS app; fall back to the messaging category launcher.
-        val smsIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val fallback = Intent(Intent.ACTION_MAIN)
-            .addCategory(Intent.CATEGORY_APP_MESSAGING)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { startActivity(smsIntent) }
-            .onFailure { runCatching { startActivity(fallback) } }
     }
 }

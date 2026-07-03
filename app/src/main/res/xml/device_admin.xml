@@ -5,7 +5,7 @@
   request wipe, password, or camera-disable policies. This is uninstall friction, not control.
 -->
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-policies>
-        <force-lock />
-    </uses-policies>
+    <!-- No policies requested. Being an active admin is enough for uninstall friction; we don't
+         want any control powers (wipe/password/lock). Empty is valid and the least intrusive. -->
+    <uses-policies />
 </device-admin>

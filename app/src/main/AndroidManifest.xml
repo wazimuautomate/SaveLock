@@ -8,6 +8,9 @@
     <!-- Re-arm the daily lock after a reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Needed for the "Battery: Unrestricted" prompt to appear -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Exact daily lock alarm. USE_EXACT_ALARM auto-grants on 33+; SCHEDULE_EXACT_ALARM covers
          31/32 (user-grantable). Code falls back to inexact if neither is available. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

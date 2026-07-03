@@ -1,7 +1,10 @@
 package com.example.data.local
 
 import androidx.room.TypeConverter
+import com.example.data.local.entity.AmountType
 import com.example.data.local.entity.LockMode
+import com.example.data.local.entity.PeriodType
+import com.example.data.local.entity.PlanType
 import com.example.data.local.entity.SavingsStatus
 
 /**
@@ -38,4 +41,25 @@ class Converters {
     @TypeConverter
     fun toLockMode(value: String): LockMode =
         runCatching { LockMode.valueOf(value) }.getOrDefault(LockMode.CHOSEN_APPS)
+
+    @TypeConverter
+    fun fromPlanType(v: PlanType): String = v.name
+
+    @TypeConverter
+    fun toPlanType(v: String): PlanType =
+        runCatching { PlanType.valueOf(v) }.getOrDefault(PlanType.SAVINGS)
+
+    @TypeConverter
+    fun fromAmountType(v: AmountType): String = v.name
+
+    @TypeConverter
+    fun toAmountType(v: String): AmountType =
+        runCatching { AmountType.valueOf(v) }.getOrDefault(AmountType.FIXED)
+
+    @TypeConverter
+    fun fromPeriodType(v: PeriodType): String = v.name
+
+    @TypeConverter
+    fun toPeriodType(v: String): PeriodType =
+        runCatching { PeriodType.valueOf(v) }.getOrDefault(PeriodType.DAILY)
 }

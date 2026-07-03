@@ -21,7 +21,7 @@ class RecoveryCodeManager {
     data class GeneratedCode(val plaintext: String, val entity: RecoveryCodeEntity)
 
     /** Generate [count] fresh codes. Returns plaintext (to show once) paired with the row to store. */
-    fun generate(count: Int = 10): List<GeneratedCode> {
+    fun generate(count: Int = 3): List<GeneratedCode> {
         val random = SecureRandom()
         val now = System.currentTimeMillis()
         return (0 until count).map {
@@ -71,7 +71,8 @@ class RecoveryCodeManager {
         private const val ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
         private const val CODE_LENGTH = 8
         private const val SALT_BYTES = 16
-        private const val ITERATIONS = 120_000
+        // Strong enough for offline personal codes, light enough to stay snappy on low-end phones.
+        private const val ITERATIONS = 50_000
         private const val KEY_LENGTH_BITS = 256
         private const val MASKED = "••••-••••"
     }

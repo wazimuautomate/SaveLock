@@ -67,10 +67,18 @@ object PermissionsHelper {
     )
 
     /** Ask the system to ignore battery optimizations for us (the "Unrestricted" battery setting). */
-    fun openBatteryOptimizationSettings(context: Context) = start(
-        context,
-        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
-    )
+    fun openBatteryOptimizationSettings(context: Context) {
+        // 1) Direct "allow?" dialog (needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission).
+        val direct = Intent(
+            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            Uri.parse("package:${context.packageName}")
+        )
+        if (start(context, direct)) return
+        // 2) The full battery-optimization list.
+        if (start(context, Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))) return
+        // 3) Last resort: the app details page (Battery menu is in there).
+        openAppDetails(context)
+    }
 
     fun openExactAlarmSettings(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -88,16 +96,20 @@ object PermissionsHelper {
                 DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                 "Enable uninstall protection: you'll need to turn this off before uninstalling SaveLock."
             )
-        start(context, intent)
+        if (start(context, intent)) return
+        // Fallback: some OEMs bury it under Security settings.
+        if (start(context, Intent(Settings.ACTION_SECURITY_SETTINGS))) return
+        openAppDetails(context)
     }
 
     /** Fallback app-details screen (for battery menus that vary by OEM, e.g. Samsung). */
-    fun openAppDetails(context: Context) = start(
+    fun openAppDetails(context: Context): Boolean = start(
         context,
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
     )
 
-    private fun start(context: Context, intent: Intent) {
-        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-    }
+    /** Returns true if an Activity actually launched. */
+    private fun start(context: Context, intent: Intent): Boolean =
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }
+            .getOrDefault(false)
 }

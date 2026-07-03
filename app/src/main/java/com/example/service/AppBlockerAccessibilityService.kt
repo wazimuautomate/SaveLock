@@ -3,8 +3,6 @@ package com.example.service
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.provider.Settings
-import android.provider.Telephony
-import android.telecom.TelecomManager
 import android.view.accessibility.AccessibilityEvent
 import com.example.di.ServiceLocator
 import com.example.overlay.LockOverlayActivity
@@ -13,9 +11,10 @@ import com.example.overlay.LockOverlayActivity
  * Detects when a foreground app changes and, while the lock is active, redirects blocked apps to the
  * SaveLock lock screen.
  *
- * HARD SAFETY RULE (never remove): the dialer, the default messaging app, the system UI, the current
- * keyboard, and SaveLock itself are ALWAYS allowed and can never be blocked — in either lock mode.
- * Emergency access (calling for help) must never be blockable. The user can also always escape via
+ * HARD SAFETY RULE (never remove): the telephony/emergency-call infrastructure, the system UI, the
+ * current keyboard, and SaveLock itself are ALWAYS allowed. Emergency calling (via the lock screen's
+ * Emergency button) must never be blockable. NOTE: in full lockdown the NORMAL phone and messaging
+ * apps ARE blocked — only the system emergency dialer is reachable. The user can always escape via
  * Safe Mode, which disables this service entirely.
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
@@ -61,26 +60,19 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Builds the ALWAYS-allowed set: dialer + default SMS app + system UI + current keyboard.
-     * These can never be blocked so the user can always call/text for help and use the phone shell.
+     * Builds the ALWAYS-allowed set: telephony/emergency infrastructure + system UI + current
+     * keyboard + SaveLock itself. The NORMAL dialer/SMS apps are intentionally NOT here, so full
+     * lockdown blocks them too — only the system emergency dialer (com.android.phone) stays reachable.
      */
     private fun buildEmergencyAllowList(): Set<String> {
         val allowed = mutableSetOf(
             "com.android.systemui",
-            "com.android.phone",
-            "com.android.server.telecom",
-            "com.android.emergency",
+            "com.android.phone",          // telephony service + system emergency dialer
+            "com.android.server.telecom", // in-call UI during an emergency call
+            "com.android.emergency",      // emergency info app
             packageName
         )
-        // Default dialer
-        runCatching {
-            (getSystemService(TelecomManager::class.java))?.defaultDialerPackage?.let { allowed.add(it) }
-        }
-        // Default messaging app
-        runCatching {
-            Telephony.Sms.getDefaultSmsPackage(this)?.let { allowed.add(it) }
-        }
-        // Current keyboard (so typing a recovery code / message always works)
+        // Current keyboard (so typing a recovery code always works)
         runCatching {
             Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
                 ?.substringBefore('/')

@@ -9,9 +9,11 @@ import com.example.data.local.entity.SavingsLogEntity
 import com.example.data.local.entity.SavingsStatus
 import com.example.domain.RecoveryCodeManager
 import com.example.util.DateUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * The single source of truth for the app's data. Exposes Kotlin [Flow]s that the ViewModels collect,
@@ -165,15 +167,16 @@ class SaveLockRepository(
      * Generate a fresh batch of [count] codes, replacing any existing ones. Returns the plaintext
      * codes to display ONCE — they are never retrievable again.
      */
-    suspend fun regenerateRecoveryCodes(count: Int = 10): List<String> {
-        val generated = recoveryCodeManager.generate(count)
+    suspend fun regenerateRecoveryCodes(count: Int = 3): List<String> {
+        // Hashing is CPU-heavy — run it OFF the main thread so the UI never freezes/crashes (ANR).
+        val generated = withContext(Dispatchers.Default) { recoveryCodeManager.generate(count) }
         recoveryDao.deleteAll()
         recoveryDao.insertAll(generated.map { it.entity })
         return generated.map { it.plaintext }
     }
 
     /** Ensure at least one batch exists (called at startup so the user always has codes). */
-    suspend fun ensureRecoveryCodesExist(count: Int = 10): List<String>? {
+    suspend fun ensureRecoveryCodesExist(count: Int = 3): List<String>? {
         return if (recoveryDao.count() == 0) regenerateRecoveryCodes(count) else null
     }
 
@@ -183,7 +186,10 @@ class SaveLockRepository(
      */
     suspend fun redeemRecoveryCode(input: String): Boolean {
         val unused = recoveryDao.getUnused()
-        val match = unused.firstOrNull { recoveryCodeManager.verify(input, it) } ?: return false
+        // Verifying is CPU-heavy (PBKDF2) — do it off the main thread.
+        val match = withContext(Dispatchers.Default) {
+            unused.firstOrNull { recoveryCodeManager.verify(input, it) }
+        } ?: return false
         recoveryDao.markUsed(match.id, System.currentTimeMillis())
         markRecoveryUsedToday()
         return true
