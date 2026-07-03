@@ -11,6 +11,28 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 2: Owner test feedback round 1 (CI green, commit bb98ea6)
+
+Fixed from owner testing:
+- ✅ Distraction apps are now DYNAMIC (real installed apps via `InstalledAppsProvider`); config stores
+  `restrictedPackages: List<String>` (removed hardcoded `DistractionAppRecord`); DB bumped to v2.
+  Distraction list is hidden when Full Lockdown is selected.
+- ✅ Payment sheet number is pay-FROM only now — editing it no longer overwrites the saved primary
+  number (`DashboardViewModel.updateMpesaNumber` no longer persists).
+- ✅ Recovery Codes screen has an explicit "Generate New Codes" button (revokes old, reveals+stores
+  new, copiable). Removed the racy auto-generate-on-open.
+- ✅ Removed the "Need emergency reset? Use Recovery Code" link from Home.
+- ✅ Stronger lock: `LockOverlayActivity` immersive full-screen (hides nav+status bars), swallows
+  Back, keep-screen-on, sticky immersive; `ShadeGuard` overlay blocks the notification shade during
+  full lockdown (via the foreground service). NOTE: true kiosk (fully killing home/recents) needs
+  Device Owner (factory reset + PC) — out of scope; documented as best-effort.
+
+⏳ STILL PENDING from feedback (the big one): **Savings vs Goals redesign** + remove global lock-time
+("everything locks once not paid") + per-item schedules + home progress bars. Waiting on owner
+answers to 4 design questions before building (asked at end of this session).
+
+---
+
 ## 2026-07-03 — Session 1 (later): FULL FEATURE BUILD COMPLETE ✅ (CI green throughout)
 
 All 14 planned todos are done and every batch was verified compiling via GitHub Actions.
