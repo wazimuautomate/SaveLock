@@ -6,6 +6,18 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Changed (lock-screen motivation)
+- **The lock screen now speaks to you.** The old generic "your distraction apps are locked out"
+  line is replaced by a bold, deliberately provoking message with a supporting sub-line — and it
+  **rotates to a different one every day**. Savings plans and Goals each have their own set of
+  messages; goal messages weave in the goal's name, days left, amount remaining and percent done
+  (e.g. "You're only Ksh 3,500 away from Bike."). Long titles auto-shrink so they always fit.
+
+### Fixed (backend wiring)
+- Corrected the GitHub secret name so the released APK is actually wired to Supabase (the URL secret
+  had been named `SUPABASE_FUNCTIONS_KEY` instead of `SUPABASE_FUNCTIONS_URL`, so builds shipped
+  "unconfigured" and payments showed the "not set up" message).
+
 ### Changed (payments + final hardening)
 - **Real M-Pesa payments** — the app now performs a genuine STK Push through the backend (to your
   **Till / Buy Goods** number). The old demo/auto-success is gone; if the backend isn't set up yet,

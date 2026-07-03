@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.VpnKey
@@ -29,6 +28,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.domain.GoalVars
+import com.example.domain.LockMessage
+import com.example.domain.LockMessages
 import com.example.ui.components.PaymentSheetContent
 import com.example.ui.theme.SaveLockAmber
 import com.example.ui.theme.SaveLockPrimary
@@ -69,7 +71,7 @@ fun LockScreenContent(
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (panel) {
             Panel.Main -> MainPanel(
-                banner = lock.bannerMessage,
+                fullLockdown = lock.fullLockdown,
                 duePlans = dash.plans.filter { it.isLocking },
                 onPay = { id ->
                     dashboardViewModel.resetPaymentState()
@@ -116,11 +118,38 @@ fun LockScreenContent(
 
 @Composable
 private fun MainPanel(
-    banner: String,
+    fullLockdown: Boolean,
     duePlans: List<com.example.viewmodel.PlanRow>,
     onPay: (Long) -> Unit,
     onRecovery: () -> Unit
 ) {
+    // Rotate the provoking copy once per day. The pool (savings vs goal) follows the primary due
+    // plan; goal copy is filled with that goal's name, days left, amount remaining and percent.
+    val dayIndex = remember { java.time.LocalDate.now().toEpochDay() }
+    val primary = duePlans.firstOrNull()
+    val message = remember(dayIndex, primary?.id, primary?.isGoal) {
+        when {
+            primary == null ->
+                LockMessage("Phone Locked", "Pay a due plan below or enter a recovery code to unlock.")
+            primary.isGoal -> LockMessages.forGoal(
+                dayIndex,
+                GoalVars(
+                    goalName = primary.name,
+                    daysLeft = primary.goalDaysLeft,
+                    amountRemaining = primary.goalAmountRemaining,
+                    percent = primary.goalPercent
+                )
+            )
+            else -> LockMessages.forSavings(dayIndex)
+        }
+    }
+    // Scale the headline down as it gets longer so even the long titles fit without clipping.
+    val (titleSize, titleLine) = when {
+        message.title.length <= 28 -> 26.sp to 32.sp
+        message.title.length <= 52 -> 22.sp to 28.sp
+        else -> 19.sp to 25.sp
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -139,17 +168,31 @@ private fun MainPanel(
         ) {
             Icon(Icons.Default.Lock, contentDescription = "Locked", tint = SaveLockRed, modifier = Modifier.size(40.dp))
         }
-        Spacer(Modifier.height(20.dp))
-        Text("Phone Locked", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = SaveLockRed, textAlign = TextAlign.Center)
 
-        Spacer(Modifier.height(12.dp))
-        Box(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(banner, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 16.sp)
-            }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            message.title,
+            fontSize = titleSize,
+            lineHeight = titleLine,
+            fontWeight = FontWeight.Black,
+            color = SaveLockRed,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            message.subtitle,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (fullLockdown) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Full lockdown is active — only emergency calls are available.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
 
         Spacer(Modifier.height(24.dp))
