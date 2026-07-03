@@ -11,6 +11,46 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 5: Unbypassable lock + big UX pass (CI GREEN, commit 323e8a2)
+
+Owner feedback (one big batch). All done + CI-green across 2 commits (5651808 UX, 323e8a2 lock).
+
+UX/structure (commit 5651808):
+- ✅ **Plan management moved to Settings** (create/edit/delete + master Saving-Enabled toggle under
+  "Savings & Goals"). Home is now progress-only (per-plan cards + Pay button).
+- ✅ Removed obsolete Savings Configuration (daily amount + primary number) + notification test section.
+- ✅ **Permissions UX**: only ungranted items shown (granted ones vanish); amber Warning icon +
+  "Turn on"; "How do I turn this on?" expandable steps for Uninstall protection (Device admin).
+- ✅ **App icons** shown in the Lock-strictness apps list (`InstalledAppsProvider.AppInfo.icon`).
+- ✅ **Phone normalisation** (`PhoneUtils`): accepts 07../01../+254../254.. → 2547../2541...
+
+THE LOCK — rebuilt to be unbypassable (commit 323e8a2):
+- ✅ Lock is now a **focusable `TYPE_APPLICATION_OVERLAY`** window (`service/LockScreenController`)
+  driven by the accessibility service — NOT an Activity. Stays on top of launcher + recents (Home/
+  Recents no longer reveal blocked apps), swallows Back. Keyboard works over it (why not accessibility
+  overlay — that can hide the IME). `ShadeGuard` still blocks the shade.
+- ✅ Chosen research: `TYPE_ACCESSIBILITY_OVERLAY` floats above everything incl. IME → would break
+  typing; `TYPE_APPLICATION_OVERLAY` (needs the "Display over other apps" perm we already request) is
+  the reliable choice for a lock that needs input.
+- ✅ **`LockScreenContent`** = inline lock UI, NO Dialog/Popup/ModalBottomSheet (those need an Activity
+  window and crash in a raw overlay). Panels: due plans+Pay / inline payment (`PaymentSheetContent`
+  card) / inline recovery. Fixes the "only shows Resolving…" + "no payment option" bug.
+- ✅ **Emergency button removed entirely** (it exposed home/recents and broke the lock). Escapes now:
+  pay, recovery code, or Safe Mode.
+- ✅ Deleted `overlay/LockOverlayActivity` + `ui/screens/OverlayScreen`; removed the manifest activity;
+  in-app "Preview Lock Screen" renders `LockScreenContent`. Compose-in-overlay hosted via a custom
+  Lifecycle/SavedState/ViewModelStore owner (`OverlayLifecycleHost`).
+
+⚠️ NEEDS ON-DEVICE TEST (I cannot run it): overlay z-order + IME + Back behaviour vary by OEM (esp.
+Samsung). Gesture-nav "home" always sends launcher behind the overlay (overlay stays on top). If the
+overlay ever fails to appear, it's almost always the "Display over other apps" permission being off,
+or the OEM killing the accessibility service (battery unrestricted + autostart).
+
+⏳ Still-open polish ideas: pause-vs-delete a plan; per-plan reminder notifications; prune dead legacy
+(SavingsLog/lockTime/ReminderWorker/RecoveryCodeEntryScreen route now unreachable). Deploy still owner-run.
+
+---
+
 ## 2026-07-03 — Session 4: Till payments + polish (CI GREEN, commit 0a5c684)
 
 - ✅ **Till (Buy Goods) payments**: `daraja.ts` now sends `TransactionType=CustomerBuyGoodsOnline`,
@@ -247,3 +287,17 @@ copy; app-picker for distraction apps (currently a fixed default list the user t
 **Open questions / watch-outs**
 - Need owner's Supabase project details (URL + anon key) before the app can call the backend —
   will ask when we reach payment wiring. Daraja credentials go only into Supabase env vars.
+
+## Session 2026-07-03 — DB pushed to Supabase
+- `supabase` CLI wasn't on PATH; it IS available via `npx supabase` (v2.109.0). To fix PATH
+  permanently, install with `scoop install supabase` or add the binary dir to PATH.
+- Project ref: **kvdugtdgobtjtychifzb** (from backend/.env SUPABASE_URL).
+- `db push` needs the DB **password** (direct Postgres), which we don't have stored — so instead
+  applied `0001_init.sql` via the **Management API query endpoint**
+  (`POST https://api.supabase.com/v1/projects/{ref}/database/query`, Bearer = access token).
+- Verified live: `public.stk_transactions` exists (all 10 cols) + `stk_transactions_status_idx`,
+  **RLS enabled**. Recorded version `0001` in `supabase_migrations.schema_migrations`.
+- NOTE: remote already tracked an earlier migration `20260614143714 add_services_indexes` that is
+  NOT in local backend/supabase/migrations/ — possible drift; investigate if it matters later.
+- SECURITY: the access token was pasted into chat in plaintext → owner should **revoke/rotate it**
+  in Supabase dashboard (Account → Access Tokens) now that the push is done.

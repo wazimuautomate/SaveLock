@@ -6,6 +6,19 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Changed (lock strength + UX)
+- **The lock is now far harder to bypass.** It's a full-screen overlay that stays on top of the
+  home screen and recent apps, and the Back button no longer closes it. You can still type your
+  recovery code / phone number on it, and the notification shade stays blocked.
+- **Removed the Emergency button** from the lock screen (it was letting people slip past the lock).
+  To get out: pay, use a recovery code, or restart the phone in Safe Mode.
+- **Home is now just your progress.** Creating, editing, deleting plans and the master
+  Saving-Enabled switch moved to **Settings → Savings & Goals**.
+- **Setup & Permissions** only lists what's still off (each with a warning + "Turn on"), and shows
+  step-by-step help for turning on Uninstall protection.
+- Phone numbers can be typed as **07…, 01…, +254…, or 254…** — they're normalised automatically.
+- The app-blocking list now shows each app's **icon** for easy identification.
+
 ### Added
 - **Edit a plan**: each Savings/Goal on Home now has an edit button to change its name, amount,
   schedule, or goal target without deleting it.

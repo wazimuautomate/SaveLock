@@ -100,10 +100,11 @@ SaveLock/
 │        │  ├─ BootReceiver.kt          (new) re-arms after reboot
 │        │  └─ ReminderWorker.kt        (new) WorkManager reminders
 │        ├─ service/
-│        │  ├─ SaveLockForegroundService.kt         (new)
-│        │  └─ AppBlockerAccessibilityService.kt    (new)
+│        │  ├─ SaveLockForegroundService.kt         (new) resilience anchor + ShadeGuard
+│        │  ├─ AppBlockerAccessibilityService.kt    (new) drives the lock overlay
+│        │  └─ LockScreenController.kt              (new) full-screen system-overlay lock window
 │        ├─ admin/DeviceAdminReceiver.kt            (new) uninstall friction
-│        ├─ overlay/LockOverlayActivity.kt          (new) re-presenting block screen
+│        ├─ ui/screens/LockScreenContent.kt         (new) inline lock UI (no dialogs; runs in overlay)
 │        ├─ util/NotificationManagerHelper.kt       (mod) reminders/status channels
 │        ├─ ui/…                        UI scaffold (unchanged look)
 │        └─ viewmodel/*ViewModel.kt     (mod) consume repository Flows
@@ -116,7 +117,7 @@ SaveLock/
 1. **Settings screen** writes `SavingsConfig` (amount, lock time, reminders, M-Pesa number, distraction apps, enabled flag) → Room → repository `Flow` → every screen updates.
 2. `AlarmScheduler` sets an exact alarm at the lock time; WorkManager schedules reminders at each lead time; foreground service supervises.
 3. **Reminder time:** notification on the `reminders` channel.
-4. **Lock time:** if today's `SavingsLog` is not "Saved", the app enters *locked* state. The AccessibilityService now redirects any opened distraction app to `LockOverlayActivity`. A `status` notification fires.
+4. **Lock time:** if any active plan's current period is due-and-unpaid, the app enters *locked* state. The AccessibilityService puts up SaveLock's full-screen **system overlay** (`LockScreenController`, `TYPE_APPLICATION_OVERLAY`) — it stays over the launcher/recents and swallows Back. A `status` notification fires. (Design note: the lock is now per-plan, not a single global lock time.)
 5. **User pays:** Payment sheet → backend `/stk-push` → poll `/stk-status` → on success write a `SavingsLog` (Saved), bump streak, clear lock, cancel remaining reminders/notifications.
 6. **No signal:** user enters a **recovery code** → verified offline against hashed codes → mark used → today's `SavingsLog` = "Recovery code used" → lift lock. (Or the queued payment auto-retries when online.)
 6. **Reboot:** `BootReceiver` re-arms alarms and restarts the service/lock state.
