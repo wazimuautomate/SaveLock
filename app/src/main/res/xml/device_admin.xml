@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal device-admin policy. We deliberately request only "force-lock" (the least intrusive
+  policy) — enough to register as an admin so uninstall requires disabling admin first. We do NOT
+  request wipe, password, or camera-disable policies. This is uninstall friction, not control.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

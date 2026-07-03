@@ -27,10 +27,62 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.SaveLockAmber
 import com.example.ui.theme.SaveLockPrimary
 import com.example.ui.theme.SaveLockRed
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.local.entity.LockMode
 import com.example.util.NotificationManagerHelper
+import com.example.util.PermissionsHelper
 import com.example.viewmodel.SettingsViewModel
 import com.example.viewmodel.ThemeMode
+
+@Composable
+private fun PermissionRow(
+    title: String,
+    subtitle: String,
+    granted: Boolean,
+    onGrant: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        if (granted) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = SaveLockPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text("On", color = SaveLockPrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+            }
+        } else {
+            Button(
+                onClick = onGrant,
+                colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Grant")
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -68,6 +120,83 @@ fun SettingsScreen(
                 fontWeight = FontWeight.Black,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
+
+            // Re-check permission statuses each time the screen resumes (e.g. after returning
+            // from a system settings page).
+            val lifecycleOwner = LocalLifecycleOwner.current
+            var permRefresh by remember { mutableStateOf(0) }
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) permRefresh++
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+
+            Text(
+                text = "SETUP & PERMISSIONS",
+                style = MaterialTheme.typography.labelMedium,
+                color = SaveLockPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Finish setting up",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tap each item and turn it on. SaveLock can't grant these for you (Android won't allow it).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    PermissionRow(
+                        title = "Notifications",
+                        subtitle = "Reminders and lock alerts",
+                        granted = remember(permRefresh) { PermissionsHelper.isNotificationsEnabled(context) },
+                        onGrant = { PermissionsHelper.openNotificationSettings(context) }
+                    )
+                    PermissionRow(
+                        title = "Display over other apps",
+                        subtitle = "Lets the lock screen appear over blocked apps",
+                        granted = remember(permRefresh) { PermissionsHelper.isOverlayGranted(context) },
+                        onGrant = { PermissionsHelper.openOverlaySettings(context) }
+                    )
+                    PermissionRow(
+                        title = "Accessibility (App Blocker)",
+                        subtitle = "Detects when you open a blocked app",
+                        granted = remember(permRefresh) { PermissionsHelper.isAccessibilityEnabled(context) },
+                        onGrant = { PermissionsHelper.openAccessibilitySettings(context) }
+                    )
+                    PermissionRow(
+                        title = "Battery: Unrestricted",
+                        subtitle = "Stops the phone from killing SaveLock",
+                        granted = remember(permRefresh) { PermissionsHelper.isIgnoringBatteryOptimizations(context) },
+                        onGrant = { PermissionsHelper.openBatteryOptimizationSettings(context) }
+                    )
+                    PermissionRow(
+                        title = "Alarms & reminders (exact)",
+                        subtitle = "Makes the daily lock fire on time",
+                        granted = remember(permRefresh) { PermissionsHelper.canScheduleExactAlarms(context) },
+                        onGrant = { PermissionsHelper.openExactAlarmSettings(context) }
+                    )
+                    PermissionRow(
+                        title = "Uninstall protection",
+                        subtitle = "Must turn off before uninstalling (optional)",
+                        granted = remember(permRefresh) { PermissionsHelper.isDeviceAdminActive(context) },
+                        onGrant = { PermissionsHelper.requestDeviceAdmin(context) }
+                    )
+                }
+            }
 
             // Section 1: Savings & Target
             Text(

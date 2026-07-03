@@ -85,6 +85,19 @@
             android:name=".scheduling.LockCheckReceiver"
             android:exported="false" />
 
+        <!-- Device Admin: uninstall friction (must disable admin before uninstalling) -->
+        <receiver
+            android:name=".admin.SaveLockDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Re-arms alarms and the lock after reboot -->
         <receiver
             android:name=".scheduling.BootReceiver"
