@@ -13,6 +13,7 @@ import com.example.di.ServiceLocator
 import com.example.domain.PlanLogic
 import com.example.scheduling.AlarmScheduler
 import com.example.util.NotificationManagerHelper
+import com.example.util.PhoneUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -263,10 +264,10 @@ class DashboardViewModel(
     }
 
     fun updateMpesaNumber(number: String) {
-        val valid = validateMpesa(number)
+        val valid = PhoneUtils.isValid(number)
         // Pay-FROM number for THIS payment only; does not change the saved primary number.
         payState.update {
-            it.copy(phoneText = number, phoneError = if (valid) null else "Format must be 2547XXXXXXXX")
+            it.copy(phoneText = number, phoneError = if (valid) null else "Enter e.g. 0712345678")
         }
     }
 
@@ -274,9 +275,10 @@ class DashboardViewModel(
         viewModelScope.launch {
             val planId = payState.value.targetPlanId ?: return@launch
             val cfg = repository.getConfig()
-            val phone = payState.value.phoneText ?: cfg.mpesaNumber
-            if (!validateMpesa(phone)) {
-                payState.update { it.copy(phoneError = "Format must be 2547XXXXXXXX") }
+            val raw = payState.value.phoneText ?: cfg.mpesaNumber
+            val phone = PhoneUtils.normalize(raw)
+            if (phone == null) {
+                payState.update { it.copy(phoneError = "Enter e.g. 0712345678") }
                 return@launch
             }
             payState.update { it.copy(phoneError = null) }
@@ -337,6 +339,4 @@ class DashboardViewModel(
     fun resetPaymentState() {
         payState.update { it.copy(paymentStatus = PaymentStatus.Idle) }
     }
-
-    private fun validateMpesa(phone: String): Boolean = Regex("^2547\\d{8}$").matches(phone)
 }

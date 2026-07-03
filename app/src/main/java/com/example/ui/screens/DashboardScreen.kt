@@ -32,14 +32,11 @@ import com.example.viewmodel.PlanRow
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
-    onNavigateToCreatePlan: () -> Unit,
-    onEditPlan: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     var isSheetOpen by remember { mutableStateOf(false) }
-    var deleteTarget by remember { mutableStateOf<PlanRow?>(null) }
 
     LaunchedEffect(uiState.paymentStatus) {
         if (uiState.paymentStatus != PaymentStatus.Idle) isSheetOpen = true
@@ -139,28 +136,18 @@ fun DashboardScreen(
                 }
             }
 
-            // Section header + create
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "YOUR SAVINGS & GOALS",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = SaveLockPrimary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp
-                )
-                TextButton(onClick = onNavigateToCreatePlan, modifier = Modifier.testTag("create_plan_button")) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("New", fontWeight = FontWeight.Bold)
-                }
-            }
+            // Section header
+            Text(
+                text = "YOUR SAVINGS & GOALS",
+                style = MaterialTheme.typography.labelMedium,
+                color = SaveLockPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
+            )
 
             if (!uiState.hasPlans) {
-                EmptyPlansCard(onNavigateToCreatePlan)
+                EmptyPlansCard()
             } else {
                 uiState.plans.forEach { plan ->
                     PlanCard(
@@ -169,89 +156,13 @@ fun DashboardScreen(
                             viewModel.resetPaymentState()
                             viewModel.openPaymentForPlan(plan.id)
                             isSheetOpen = true
-                        },
-                        onEdit = { onEditPlan(plan.id) },
-                        onDelete = { deleteTarget = plan }
+                        }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
-            // Master switch
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (uiState.isSavingEnabled) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                            contentDescription = null,
-                            tint = if (uiState.isSavingEnabled) SaveLockPrimary else SaveLockRed,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text("Saving Enabled", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "Master switch for all locks",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = uiState.isSavingEnabled,
-                        onCheckedChange = { viewModel.toggleSavingEnabled(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = SaveLockPrimary
-                        )
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(80.dp))
-        }
-
-        // Disable confirmation
-        if (uiState.showDisablingConfirmation) {
-            AlertDialog(
-                onDismissRequest = { viewModel.confirmDisableSaving(false) },
-                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = SaveLockRed) },
-                title = { Text("Disable Saving?") },
-                text = { Text("This turns off all locks and triggers for every plan. Are you sure?") },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.confirmDisableSaving(true) },
-                        colors = ButtonDefaults.buttonColors(containerColor = SaveLockRed)
-                    ) { Text("Disable") }
-                },
-                dismissButton = { TextButton(onClick = { viewModel.confirmDisableSaving(false) }) { Text("Cancel") } }
-            )
-        }
-
-        // Delete confirmation
-        deleteTarget?.let { target ->
-            AlertDialog(
-                onDismissRequest = { deleteTarget = null },
-                icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = SaveLockRed) },
-                title = { Text("Delete \"${target.name}\"?") },
-                text = { Text("This removes the plan and its saved progress from this phone. This cannot be undone.") },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.deletePlan(target.id); deleteTarget = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = SaveLockRed)
-                    ) { Text("Delete") }
-                },
-                dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } }
-            )
         }
 
         // Payment sheet
@@ -275,7 +186,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun PlanCard(plan: PlanRow, onSave: () -> Unit) {
     val accent = when {
         plan.isComplete -> SaveLockPrimary
         plan.isLocking -> SaveLockRed
@@ -309,14 +220,10 @@ private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onEdit: () -> Unit, onDe
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Row {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                    }
+                if (plan.isLocking) {
+                    Icon(Icons.Default.Lock, contentDescription = "Locked", tint = SaveLockRed, modifier = Modifier.size(18.dp))
+                } else if (plan.isComplete) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = "Complete", tint = SaveLockPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -368,7 +275,7 @@ private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onEdit: () -> Unit, onDe
 }
 
 @Composable
-private fun EmptyPlansCard(onCreate: () -> Unit) {
+private fun EmptyPlansCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -378,26 +285,15 @@ private fun EmptyPlansCard(onCreate: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.AddCircle, contentDescription = null, tint = SaveLockPrimary, modifier = Modifier.size(44.dp))
+            Icon(Icons.Default.Savings, contentDescription = null, tint = SaveLockPrimary, modifier = Modifier.size(44.dp))
             Spacer(modifier = Modifier.height(12.dp))
             Text("No plans yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Create a Savings plan (save a set amount every period) or a Goal (reach a target). Each runs on its own schedule and locks your phone when a payment is due.",
+                text = "Go to Settings → Savings & Goals to create a Savings plan or a Goal. Each runs on its own schedule and locks your phone when a payment is due. Their progress appears here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onCreate,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Create your first plan", fontWeight = FontWeight.Bold)
-            }
         }
     }
 }

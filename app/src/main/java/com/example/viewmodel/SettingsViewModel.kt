@@ -1,9 +1,14 @@
 package com.example.viewmodel
 
+import android.graphics.drawable.Drawable
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.AmountType
 import com.example.data.local.entity.LockMode
+import com.example.data.local.entity.PeriodType
+import com.example.data.local.entity.PlanType
+import com.example.data.local.entity.SavingsPlanEntity
 import com.example.data.repository.SaveLockRepository
 import com.example.di.ServiceLocator
 import com.example.util.InstalledAppsProvider
@@ -20,7 +25,15 @@ import kotlinx.coroutines.withContext
 data class DistractionApp(
     val packageName: String,
     val name: String,
-    val isRestricted: Boolean
+    val isRestricted: Boolean,
+    val icon: Drawable?
+)
+
+/** Lightweight plan row for the Settings management list. */
+data class PlanLite(
+    val id: Long,
+    val name: String,
+    val subtitle: String
 )
 
 enum class ThemeMode {
@@ -28,31 +41,22 @@ enum class ThemeMode {
 }
 
 data class SettingsUiState(
-    val dailySavingsAmount: String = "500",
-    val lockScheduleTime: String = "20:00",
-    val reminderLeadHours: List<Int> = listOf(2, 1),
-    val mpesaNumber: String = "",
     val distractionApps: List<DistractionApp> = emptyList(),
     val isSavingEnabled: Boolean = true,
     val lockMode: LockMode = LockMode.CHOSEN_APPS,
+    val plans: List<PlanLite> = emptyList(),
     val showGenerateRecoveryWarning: Boolean = false,
-    val amountError: String? = null,
-    val mpesaError: String? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 /**
- * Settings backed by Room. Persisted fields (amount, time, reminders, mpesa, distraction apps,
- * saving-enabled, lock mode) go through the repository and reflect on next app open. Transient UI
- * bits (validation text, theme choice, dialogs) live in [transient].
+ * Settings backed by Room. Persisted fields (lock mode, saving-enabled, distraction apps) go through
+ * the repository. Plan management (create/edit/delete) is surfaced here too — creating/editing is done
+ * on the Create screen (via navigation callbacks); this screen lists and deletes.
  */
 class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel() {
 
     private data class Transient(
-        val amountText: String? = null,   // in-progress edit; null => show persisted value
-        val mpesaText: String? = null,
-        val amountError: String? = null,
-        val mpesaError: String? = null,
         val showGenerateRecoveryWarning: Boolean = false,
         val themeMode: ThemeMode = ThemeMode.SYSTEM
     )
@@ -71,60 +75,46 @@ class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel(
     }
 
     val uiState: StateFlow<SettingsUiState> =
-        combine(repository.config, transient, installedApps) { cfg, t, apps ->
+        combine(
+            repository.config,
+            transient,
+            installedApps,
+            repository.activePlans
+        ) { cfg, t, apps, plans ->
             SettingsUiState(
-                dailySavingsAmount = t.amountText ?: cfg.dailyAmount.toString(),
-                lockScheduleTime = cfg.lockTime,
-                reminderLeadHours = cfg.reminderLeadHours,
-                mpesaNumber = t.mpesaText ?: cfg.mpesaNumber,
                 distractionApps = apps.map {
-                    DistractionApp(it.packageName, it.label, it.packageName in cfg.restrictedPackages)
+                    DistractionApp(it.packageName, it.label, it.packageName in cfg.restrictedPackages, it.icon)
                 },
                 isSavingEnabled = cfg.savingEnabled,
                 lockMode = cfg.lockMode,
+                plans = plans.map { PlanLite(it.id, it.name, planSubtitle(it)) },
                 showGenerateRecoveryWarning = t.showGenerateRecoveryWarning,
-                amountError = t.amountError,
-                mpesaError = t.mpesaError,
                 themeMode = t.themeMode
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    private fun planSubtitle(p: SavingsPlanEntity): String {
+        val kind = if (p.type == PlanType.GOAL) "Goal" else "Savings"
+        val min = if (p.amountType == AmountType.FLEXIBLE) " min" else ""
+        val period = when (p.period) {
+            PeriodType.DAILY -> "daily"
+            PeriodType.EVERY_2_DAYS -> "every 2 days"
+            PeriodType.WEEKLY -> "weekly"
+            PeriodType.MONTHLY -> "monthly"
+            PeriodType.EVERY_N_DAYS -> "every ${p.periodValue} days"
+            PeriodType.EVERY_N_HOURS -> "every ${p.periodValue} hours"
+        }
+        val goal = if (p.type == PlanType.GOAL && p.goalTotal > 0) " → KES %,d".format(p.goalTotal) else ""
+        return "$kind • KES %,d%s %s%s".format(p.amount, min, period, goal)
+    }
 
     fun updateThemeMode(mode: ThemeMode) {
         transient.update { it.copy(themeMode = mode) }
     }
 
-    fun updateDailySavingsAmount(amount: String) {
-        val parsed = amount.toIntOrNull()
-        val valid = parsed != null && parsed > 0
-        transient.update {
-            it.copy(amountText = amount, amountError = if (valid) null else "Enter a valid positive number")
-        }
-        if (valid) viewModelScope.launch { repository.setDailyAmount(parsed!!) }
-    }
-
-    fun updateLockScheduleTime(time: String) {
-        viewModelScope.launch { repository.setLockTime(time) }
-    }
-
     fun updateLockMode(mode: LockMode) {
         viewModelScope.launch { repository.setLockMode(mode) }
         Log.d("SettingsVM", "Lock mode set to $mode")
-    }
-
-    fun addReminderLeadTime(hours: Int) {
-        viewModelScope.launch { repository.addReminderLeadHour(hours) }
-    }
-
-    fun removeReminderLeadTime(hours: Int) {
-        viewModelScope.launch { repository.removeReminderLeadHour(hours) }
-    }
-
-    fun updateMpesaNumber(number: String) {
-        val valid = Regex("^2547\\d{8}$").matches(number)
-        transient.update {
-            it.copy(mpesaText = number, mpesaError = if (valid) null else "Format must be 2547XXXXXXXX")
-        }
-        if (valid) viewModelScope.launch { repository.setMpesaNumber(number) }
     }
 
     fun toggleDistractionApp(packageName: String) {
@@ -135,14 +125,15 @@ class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel(
         viewModelScope.launch { repository.setSavingEnabled(enabled) }
     }
 
+    fun deletePlan(id: Long) {
+        viewModelScope.launch { repository.deletePlan(id) }
+    }
+
     fun triggerGenerateRecoveryWarning(show: Boolean) {
         transient.update { it.copy(showGenerateRecoveryWarning = show) }
     }
 
-    /**
-     * User confirmed regeneration. The actual generate + one-time reveal happens on the Recovery
-     * Codes screen (see RecoveryViewModel.generateNewCodes), which this navigates to via the UI.
-     */
+    /** User confirmed regeneration; the actual generate + one-time reveal happens on the Recovery screen. */
     fun generateNewRecoveryCodes() {
         transient.update { it.copy(showGenerateRecoveryWarning = false) }
     }

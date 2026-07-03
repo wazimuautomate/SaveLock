@@ -123,17 +123,9 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Dashboard.route,
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        // 1. Home Screen (Savings & Goals)
+                        // 1. Home Screen (Savings & Goals progress only)
                         composable(Screen.Dashboard.route) {
-                            DashboardScreen(
-                                viewModel = dashboardViewModel,
-                                onNavigateToCreatePlan = {
-                                    navController.navigate(Screen.CreatePlan.route())
-                                },
-                                onEditPlan = { id ->
-                                    navController.navigate(Screen.CreatePlan.route(id))
-                                }
-                            )
+                            DashboardScreen(viewModel = dashboardViewModel)
                         }
 
                         // 1b. Create / Edit Savings or Goal
@@ -175,6 +167,12 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSimulateLockOverlay = {
                                     navController.navigate(Screen.LockOverlay.route)
+                                },
+                                onCreatePlan = {
+                                    navController.navigate(Screen.CreatePlan.route())
+                                },
+                                onEditPlan = { id ->
+                                    navController.navigate(Screen.CreatePlan.route(id))
                                 }
                             )
                         }
