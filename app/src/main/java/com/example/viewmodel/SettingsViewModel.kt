@@ -46,7 +46,10 @@ data class SettingsUiState(
     val lockMode: LockMode = LockMode.CHOSEN_APPS,
     val plans: List<PlanLite> = emptyList(),
     val showGenerateRecoveryWarning: Boolean = false,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    // Offline M-Pesa auto-unlock (reads the till payment SMS).
+    val tillName: String = "",
+    val smsAutoUnlockEnabled: Boolean = false
 )
 
 /**
@@ -89,7 +92,9 @@ class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel(
                 lockMode = cfg.lockMode,
                 plans = plans.map { PlanLite(it.id, it.name, planSubtitle(it)) },
                 showGenerateRecoveryWarning = t.showGenerateRecoveryWarning,
-                themeMode = t.themeMode
+                themeMode = t.themeMode,
+                tillName = cfg.tillName,
+                smsAutoUnlockEnabled = cfg.smsAutoUnlockEnabled
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -123,6 +128,14 @@ class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel(
 
     fun toggleSavingEnabled(enabled: Boolean) {
         viewModelScope.launch { repository.setSavingEnabled(enabled) }
+    }
+
+    fun updateTillName(name: String) {
+        viewModelScope.launch { repository.setTillName(name) }
+    }
+
+    fun setSmsAutoUnlock(enabled: Boolean) {
+        viewModelScope.launch { repository.setSmsAutoUnlock(enabled) }
     }
 
     fun deletePlan(id: Long) {

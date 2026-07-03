@@ -28,6 +28,10 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Read Safaricom's M-Pesa confirmation SMS to auto-unlock OFFLINE after a till payment.
+         User-grantable at runtime; only the M-Pesa payment SMS is ever inspected (see MpesaSmsReceiver). -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
     <application
         android:name=".SaveLockApplication"
         android:allowBackup="true"
@@ -92,6 +96,17 @@
                 android:resource="@xml/device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reads the M-Pesa confirmation SMS to auto-unlock offline (guarded by BROADCAST_SMS so only
+             the system can deliver it). Enforcement/matching happens in code, gated by user settings. -->
+        <receiver
+            android:name=".service.MpesaSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 

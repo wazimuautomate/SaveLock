@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.Manifest
 import android.graphics.drawable.Drawable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,6 +103,11 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     var deleteTarget by remember { mutableStateOf<PlanLite?>(null) }
+
+    // Runtime RECEIVE_SMS request for offline M-Pesa auto-unlock. On grant, turn the feature on.
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) viewModel.setSmsAutoUnlock(true) }
 
     Box(
         modifier = modifier
@@ -412,6 +420,69 @@ fun SettingsScreen(
                         Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp)); Text("Preview Lock Screen")
                     }
+                }
+            }
+
+            // ---- Offline M-Pesa auto-unlock (reads the till payment SMS) ----
+            SectionLabel("OFFLINE M-PESA UNLOCK")
+            val smsGranted = remember(permRefresh) { PermissionsHelper.isSmsPermissionGranted(context) }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Pay your till directly from the M-Pesa menu (works on signal even with NO mobile data). " +
+                            "SaveLock reads Safaricom's confirmation text and unlocks automatically — no internet needed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = uiState.tillName,
+                        onValueChange = { viewModel.updateTillName(it) },
+                        label = { Text("Your till/business name (exactly as in the M-Pesa SMS)") },
+                        placeholder = { Text("e.g. JOHN'S SHOP") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("till_name_field")
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-unlock from M-Pesa SMS", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                if (uiState.tillName.isBlank()) "Enter your till name above first"
+                                else if (!smsGranted) "Needs SMS permission — tap to grant"
+                                else "On — a till payment will unlock the phone offline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = uiState.smsAutoUnlockEnabled && smsGranted,
+                            enabled = uiState.tillName.isNotBlank(),
+                            onCheckedChange = { on ->
+                                if (!on) {
+                                    viewModel.setSmsAutoUnlock(false)
+                                } else if (smsGranted) {
+                                    viewModel.setSmsAutoUnlock(true)
+                                } else {
+                                    // Ask for RECEIVE_SMS; the launcher flips the switch on when granted.
+                                    smsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = androidx.compose.ui.graphics.Color.White, checkedTrackColor = SaveLockPrimary)
+                        )
+                    }
+                    Text(
+                        "Tip: this also confirms normal M-Pesa (STK) payments if your internet drops mid-payment. " +
+                            "True no-signal unlock still uses a recovery code.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

@@ -11,6 +11,38 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 9: Offline/low-data payments — M-Pesa SMS auto-unlock + C2B webhook
+
+Owner chose "SMS + C2B (both)". Built both. **STK is still gated on the owner setting
+`DARAJA_ENV=production` (+ prod creds) on Supabase — same creds gate C2B register.**
+
+- ✅ **On-device M-Pesa SMS auto-unlock (the real offline win).** New `domain/MpesaPaymentSms.kt`
+  (pure parser: receipt + amount + payee) + `service/MpesaSmsReceiver.kt` (SMS_RECEIVED, sender==MPESA,
+  payee matches the user's till name). On a match it credits the locking plans locally → lock lifts
+  with ZERO internet. Guarded by new config `tillName` + `smsAutoUnlockEnabled` and RECEIVE_SMS
+  (runtime-requested in Settings → "OFFLINE M-PESA UNLOCK"). Manifest: RECEIVE_SMS + receiver
+  (BROADCAST_SMS-protected).
+- ✅ **Shared crediting path** `SaveLockRepository.applyExternalPayment(receipt, amount)` — spreads a
+  confirmed real payment across due plans (oldest first), deduped by receipt via
+  `PlanPaymentDao.countByReceipt`. Used by BOTH the SMS receiver and the C2B poller; the M-Pesa code ==
+  C2B TransID, so they can never double-credit. Mirrors the STK path (recordPlanPayment only; no
+  legacy daily-log write, to keep streak consistent).
+- ✅ **C2B backend** (offline direct-till payments): migration `0002_c2b.sql` (`till_payments`, RLS on),
+  functions `c2b-validation` (accept), `c2b-confirmation` (upsert by TransID), `c2b-register`
+  (app-key, calls Daraja registerurl once), `till-payments` (app-key GET the app polls). `config.toml`
+  verify_jwt=false for all four. `_shared/daraja.ts` gained `registerC2BUrls()`.
+- ✅ **C2B app poller**: `PaymentApi.tillPayments` + `TillPaymentsResponse/Dto` +
+  `PaymentRepository.recentTillPayments()`; foreground service polls every 20s WHILE LOCKED and credits
+  via applyExternalPayment (best-effort, empty on any error).
+- ✅ **DB v3→v4 with a real MIGRATION_3_4** (adds the 2 config columns) — no more destructive wipe of
+  the owner's plans/payments/setup on this upgrade. Destructive fallback kept only as a backstop.
+- 🐛 Also fixed in Session 8 (already on main): STK HTTP errors were masked as "Timeout"; now surfaced.
+- ⚠️ OWNER TODO for these to work end-to-end: (1) `DARAJA_ENV=production` + prod creds on Supabase
+  (fixes STK too), (2) enter the exact till NAME in Settings + grant SMS + toggle on, (3) for C2B:
+  `POST /c2b-register` with the x-app-key header once (registers the confirmation/validation URLs).
+
+---
+
 ## 2026-07-03 — Session 8: STK timeout diagnosis + surface real payment errors
 
 - 🔎 **STK Push never reaches the phone → app says "Timeout".** Probed the live function:

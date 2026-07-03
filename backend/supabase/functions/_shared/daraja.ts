@@ -88,6 +88,30 @@ export async function initiateStkPush(
   return await res.json() as StkPushResult;
 }
 
+/**
+ * Register the C2B Validation + Confirmation URLs with Daraja so Safaricom notifies us whenever a
+ * customer pays our Till/Paybill directly (offline, without an STK push). Run ONCE (re-runnable).
+ *
+ * Uses the same account/creds as the STK push. ShortCode is the Till/Paybill number that receives
+ * the money (TILL_NUMBER for Buy Goods, else DARAJA_SHORTCODE). ResponseType "Completed" means
+ * Safaricom auto-completes a payment if our validation URL is slow/unreachable (we never reject).
+ */
+export async function registerC2BUrls(confirmationUrl: string, validationUrl: string): Promise<unknown> {
+  const shortCode = Deno.env.get("TILL_NUMBER") ?? Deno.env.get("DARAJA_SHORTCODE")!;
+  const token = await getAccessToken();
+  const res = await fetch(`${base()}/mpesa/c2b/v1/registerurl`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ShortCode: shortCode,
+      ResponseType: "Completed",
+      ConfirmationURL: confirmationUrl,
+      ValidationURL: validationUrl,
+    }),
+  });
+  return await res.json();
+}
+
 /** Small JSON response helper. */
 export function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {

@@ -6,6 +6,16 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Added (offline & low-data payments)
+- **Pay your till directly and unlock offline.** New **Settings → Offline M-Pesa Unlock**: enter your
+  till/business name and turn on auto-unlock. Now you can pay your till straight from the phone's
+  M-Pesa menu (works on GSM signal even with **no mobile data**), and SaveLock reads Safaricom's
+  confirmation SMS and unlocks automatically — **no internet needed on the phone**. It also rescues a
+  normal STK payment if your data drops mid-transaction. (True *no-signal* unlock still uses a
+  recovery code — M-Pesa itself always needs the network.)
+- **Server-side backup (C2B):** the backend can now catch direct till/paybill payments via Safaricom's
+  C2B webhook and the app reconciles them when it's back online — so a missed SMS still unlocks you.
+
 ### Fixed (payment errors were hidden)
 - The payment screen used to say **"Timeout"** for almost any failure (wrong keys, wrong Daraja
   environment, rejected push). It now shows the **real reason** from the backend/M-Pesa so a failing

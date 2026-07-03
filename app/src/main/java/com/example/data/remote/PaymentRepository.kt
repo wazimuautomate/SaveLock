@@ -23,6 +23,25 @@ class PaymentRepository(
         object Timeout : PayResult
     }
 
+    /** One direct Till/Paybill (C2B) payment the backend saw, ready to credit locally. */
+    data class TillPayment(val transId: String, val amount: Int)
+
+    /**
+     * Fetch recent direct-till (C2B) payments so the app can reconcile + unlock when it comes back
+     * online (backup to the offline SMS path). Returns an empty list on any error — this is a
+     * best-effort background poll, never a hard failure.
+     */
+    suspend fun recentTillPayments(sinceMinutes: Int = 1440): List<TillPayment> =
+        try {
+            api.tillPayments(appKey, sinceMinutes).payments.mapNotNull { p ->
+                val amt = p.amount?.toInt() ?: return@mapNotNull null
+                if (p.transId.isBlank() || amt <= 0) null else TillPayment(p.transId, amt)
+            }
+        } catch (e: Exception) {
+            Log.w("PaymentRepo", "till-payments fetch failed: ${e.message}")
+            emptyList()
+        }
+
     /**
      * @param accountReference "save" or "goal" — becomes the M-Pesa till account reference.
      * @param onStkSent invoked once the prompt has been sent (move UI to "waiting for PIN").
