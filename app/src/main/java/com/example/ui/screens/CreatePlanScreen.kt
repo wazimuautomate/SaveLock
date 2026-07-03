@@ -30,9 +30,11 @@ import com.example.viewmodel.DashboardViewModel
 fun CreatePlanScreen(
     viewModel: DashboardViewModel,
     onDone: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    editingPlanId: Long = -1L
 ) {
     val scroll = rememberScrollState()
+    val isEditing = editingPlanId >= 0
 
     var type by remember { mutableStateOf(PlanType.SAVINGS) }
     var name by remember { mutableStateOf("") }
@@ -42,6 +44,22 @@ fun CreatePlanScreen(
     var nText by remember { mutableStateOf("3") }
     var goalTotalText by remember { mutableStateOf("") }
     var goalDaysText by remember { mutableStateOf("") }
+
+    // Prefill the form when editing an existing plan.
+    LaunchedEffect(editingPlanId) {
+        if (isEditing) {
+            viewModel.getPlan(editingPlanId)?.let { p ->
+                type = p.type
+                name = p.name
+                amountText = p.amount.toString()
+                amountType = p.amountType
+                period = p.period
+                nText = p.periodValue.coerceAtLeast(1).toString()
+                goalTotalText = if (p.goalTotal > 0) p.goalTotal.toString() else ""
+                goalDaysText = if (p.goalDurationDays > 0) p.goalDurationDays.toString() else ""
+            }
+        }
+    }
 
     val amount = amountText.toIntOrNull() ?: 0
     val n = nText.toIntOrNull() ?: 0
@@ -60,7 +78,11 @@ fun CreatePlanScreen(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
                 IconButton(onClick = onDone) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
                 Spacer(Modifier.width(4.dp))
-                Text("New Savings or Goal", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text(
+                    if (isEditing) "Edit plan" else "New Savings or Goal",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black
+                )
             }
 
             // Type selector
@@ -162,16 +184,14 @@ fun CreatePlanScreen(
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = {
-                    viewModel.createPlan(
-                        type = type,
-                        name = name,
-                        amountType = amountType,
-                        amount = amount,
-                        period = period,
-                        periodValue = if (needsN) n else 1,
-                        goalTotal = if (type == PlanType.GOAL) goalTotal else 0,
-                        goalDurationDays = if (type == PlanType.GOAL) (goalDaysText.toIntOrNull() ?: 0) else 0
-                    )
+                    val pv = if (needsN) n else 1
+                    val gt = if (type == PlanType.GOAL) goalTotal else 0
+                    val gd = if (type == PlanType.GOAL) (goalDaysText.toIntOrNull() ?: 0) else 0
+                    if (isEditing) {
+                        viewModel.updatePlan(editingPlanId, type, name, amountType, amount, period, pv, gt, gd)
+                    } else {
+                        viewModel.createPlan(type, name, amountType, amount, period, pv, gt, gd)
+                    }
                     onDone()
                 },
                 enabled = canCreate,
@@ -179,7 +199,11 @@ fun CreatePlanScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Create plan", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (isEditing) "Save changes" else "Create plan",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
 
             Spacer(Modifier.height(12.dp))

@@ -128,16 +128,29 @@ class MainActivity : ComponentActivity() {
                             DashboardScreen(
                                 viewModel = dashboardViewModel,
                                 onNavigateToCreatePlan = {
-                                    navController.navigate(Screen.CreatePlan.route)
+                                    navController.navigate(Screen.CreatePlan.route())
+                                },
+                                onEditPlan = { id ->
+                                    navController.navigate(Screen.CreatePlan.route(id))
                                 }
                             )
                         }
 
-                        // 1b. Create Savings / Goal
-                        composable(Screen.CreatePlan.route) {
+                        // 1b. Create / Edit Savings or Goal
+                        composable(
+                            route = Screen.CreatePlan.route,
+                            arguments = listOf(
+                                androidx.navigation.navArgument("planId") {
+                                    type = androidx.navigation.NavType.LongType
+                                    defaultValue = -1L
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val planId = backStackEntry.arguments?.getLong("planId") ?: -1L
                             CreatePlanScreen(
                                 viewModel = dashboardViewModel,
-                                onDone = { navController.popBackStack() }
+                                onDone = { navController.popBackStack() },
+                                editingPlanId = planId
                             )
                         }
 

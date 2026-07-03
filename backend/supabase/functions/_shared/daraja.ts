@@ -38,13 +38,29 @@ export interface StkPushResult {
   errorMessage?: string;
 }
 
-/** Trigger the STK Push (the M-Pesa PIN prompt on the user's phone). */
-export async function initiateStkPush(phone: string, amount: number): Promise<StkPushResult> {
+/**
+ * Trigger the STK Push (the M-Pesa PIN prompt on the user's phone).
+ *
+ * PAYMENT TARGET: the money lands in a **Till (Buy Goods)**. `DARAJA_SHORTCODE` is used only to build
+ * the Lipa na M-Pesa password (the store's Head Office number); `TILL_NUMBER` is the actual till the
+ * funds go to (PartyB). Set `DARAJA_TX_TYPE=CustomerPayBillOnline` to fall back to a paybill instead.
+ *
+ * @param accountReference short label shown on the statement — we pass "save" or "goal".
+ */
+export async function initiateStkPush(
+  phone: string,
+  amount: number,
+  accountReference = "SaveLock",
+): Promise<StkPushResult> {
   const shortcode = Deno.env.get("DARAJA_SHORTCODE")!;
   const passkey = Deno.env.get("DARAJA_PASSKEY")!;
   const callbackUrl = Deno.env.get("DARAJA_CALLBACK_URL")!;
-  // Paybill by default; set DARAJA_TX_TYPE=CustomerBuyGoodsOnline for a till.
-  const txType = Deno.env.get("DARAJA_TX_TYPE") ?? "CustomerPayBillOnline";
+  const tillNumber = Deno.env.get("TILL_NUMBER");
+  // Buy Goods (till) by default; set DARAJA_TX_TYPE=CustomerPayBillOnline for a paybill.
+  const txType = Deno.env.get("DARAJA_TX_TYPE") ?? "CustomerBuyGoodsOnline";
+  const isBuyGoods = txType === "CustomerBuyGoodsOnline";
+  // For Buy Goods the funds go to the till (PartyB = TILL_NUMBER); for a paybill they go to the shortcode.
+  const partyB = isBuyGoods ? (tillNumber ?? shortcode) : shortcode;
 
   const ts = timestamp();
   const password = btoa(`${shortcode}${passkey}${ts}`);
@@ -57,11 +73,11 @@ export async function initiateStkPush(phone: string, amount: number): Promise<St
     TransactionType: txType,
     Amount: amount,
     PartyA: phone,
-    PartyB: shortcode,
+    PartyB: partyB,
     PhoneNumber: phone,
     CallBackURL: callbackUrl,
-    AccountReference: "SaveLock",
-    TransactionDesc: "SaveLock daily savings",
+    AccountReference: accountReference.slice(0, 12),
+    TransactionDesc: isBuyGoods ? "Paying Vendor Till" : "SaveLock savings",
   };
 
   const res = await fetch(`${base()}/mpesa/stkpush/v1/processrequest`, {

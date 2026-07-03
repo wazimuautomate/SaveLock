@@ -23,11 +23,12 @@ class PaymentRepository(
     }
 
     /**
+     * @param accountReference "save" or "goal" — becomes the M-Pesa till account reference.
      * @param onStkSent invoked once the prompt has been sent (move UI to "waiting for PIN").
      */
-    suspend fun pay(phone: String, amount: Int, onStkSent: () -> Unit): PayResult {
+    suspend fun pay(phone: String, amount: Int, accountReference: String, onStkSent: () -> Unit): PayResult {
         val push = try {
-            withIoRetry { api.stkPush(appKey, StkPushRequest(phone, amount)) }
+            withIoRetry { api.stkPush(appKey, StkPushRequest(phone, amount, accountReference)) }
         } catch (e: Exception) {
             Log.w("PaymentRepo", "STK push failed after retries: ${e.message}")
             return PayResult.Timeout

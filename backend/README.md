@@ -69,9 +69,10 @@ See [`.env.example`](.env.example). Summary:
 |---|---|
 | `DARAJA_CONSUMER_KEY` / `DARAJA_CONSUMER_SECRET` | Your Daraja app API credentials. |
 | `DARAJA_PASSKEY` | Lipa na M-Pesa Online passkey. |
-| `DARAJA_SHORTCODE` | Your paybill/business short code. |
+| `DARAJA_SHORTCODE` | Head-office/store short code, used only to build the Lipa na M-Pesa password. |
+| `TILL_NUMBER` | The Till (Buy Goods) number the money actually lands in (`PartyB`). |
 | `DARAJA_ENV` | `sandbox` while testing, `production` when live. |
-| `DARAJA_TX_TYPE` | `CustomerPayBillOnline` (paybill, default) or `CustomerBuyGoodsOnline` (till). |
+| `DARAJA_TX_TYPE` | `CustomerBuyGoodsOnline` (till, default) or `CustomerPayBillOnline` (paybill). |
 | `DARAJA_CALLBACK_URL` | The `/stk-callback` URL above. |
 | `APP_BACKEND_KEY` | Shared secret; must match `app/savelock.properties`. |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Auto-provided to functions in production. |

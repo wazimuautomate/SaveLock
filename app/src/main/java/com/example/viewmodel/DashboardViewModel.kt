@@ -204,6 +204,38 @@ class DashboardViewModel(
         }
     }
 
+    /** Load a plan for the edit form to prefill (null if it's gone). */
+    suspend fun getPlan(id: Long): SavingsPlanEntity? = repository.getPlan(id)
+
+    /** Save edits to an existing plan, keeping its id/createdAt anchor and payments. */
+    fun updatePlan(
+        id: Long,
+        type: PlanType,
+        name: String,
+        amountType: AmountType,
+        amount: Int,
+        period: PeriodType,
+        periodValue: Int,
+        goalTotal: Int,
+        goalDurationDays: Int
+    ) {
+        viewModelScope.launch {
+            val existing = repository.getPlan(id) ?: return@launch
+            repository.updatePlan(
+                existing.copy(
+                    type = type,
+                    name = name.trim().ifBlank { existing.name },
+                    amountType = amountType,
+                    amount = amount,
+                    period = period,
+                    periodValue = periodValue,
+                    goalTotal = goalTotal,
+                    goalDurationDays = goalDurationDays
+                )
+            )
+        }
+    }
+
     fun deletePlan(id: Long) {
         viewModelScope.launch { repository.deletePlan(id) }
     }
@@ -250,18 +282,25 @@ class DashboardViewModel(
             payState.update { it.copy(phoneError = null) }
 
             val amount = repository.amountDueNow(planId)
+            val reference = if (repository.getPlan(planId)?.type == PlanType.GOAL) "goal" else "save"
             val backend = paymentRepository
             if (backend != null) {
-                realPayment(backend, phone, amount, planId)
+                realPayment(backend, phone, amount, reference, planId)
             } else {
                 demoPayment(amount, planId)
             }
         }
     }
 
-    private suspend fun realPayment(backend: PaymentRepository, phone: String, amount: Int, planId: Long) {
+    private suspend fun realPayment(
+        backend: PaymentRepository,
+        phone: String,
+        amount: Int,
+        reference: String,
+        planId: Long
+    ) {
         payState.update { it.copy(paymentStatus = PaymentStatus.Requesting) }
-        val result = backend.pay(phone, amount, onStkSent = {
+        val result = backend.pay(phone, amount, reference, onStkSent = {
             payState.update { it.copy(paymentStatus = PaymentStatus.WaitingForSTK) }
         })
         when (result) {

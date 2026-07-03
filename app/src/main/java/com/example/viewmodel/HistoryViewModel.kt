@@ -2,13 +2,11 @@ package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.local.entity.SavingsLogEntity
-import com.example.data.local.entity.SavingsStatus
 import com.example.data.repository.SaveLockRepository
 import com.example.util.DateUtils
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 sealed interface HistoryStatus {
@@ -18,47 +16,53 @@ sealed interface HistoryStatus {
 }
 
 data class HistoryItem(
+    val planName: String,
     val date: String,
-    val targetAmount: String,
-    val savedAmount: String,
+    val amountLabel: String,
     val status: HistoryStatus
 )
 
 data class HistoryUiState(
     val historyItems: List<HistoryItem> = emptyList(),
-    // Trend points 0f..1f (fraction of target reached), oldest -> newest.
-    val trendData: List<Float> = emptyList()
+    // Trend points 0f..1f (recent payment amounts, normalised), oldest -> newest.
+    val trendData: List<Float> = listOf(0f, 0f),
+    val totalSavedLabel: String = "KES 0",
+    val paymentCount: Int = 0
 )
 
-/** Real history/trend backed by Room logs. Same UI contract as the old mock. */
+/**
+ * History of every plan payment (real money) and recovery unlock, newest first, plus a small trend
+ * chart of recent payment sizes. Names come from the plan list (active or not).
+ */
 class HistoryViewModel(private val repository: SaveLockRepository) : ViewModel() {
 
     val uiState: StateFlow<HistoryUiState> =
-        repository.logs
-            .map { logs ->
-                val items = logs.map { it.toHistoryItem() } // logs are newest-first (matches old UI)
-                val trend = logs
-                    .sortedBy { it.date }        // oldest -> newest for the chart
-                    .takeLast(12)
-                    .map { l ->
-                        if (l.targetAmount <= 0) 0f
-                        else (l.savedAmount.toFloat() / l.targetAmount).coerceIn(0f, 1f)
-                    }
-                // The chart divides by (points - 1), so it needs at least 2 points. Pad safely.
-                val safeTrend = if (trend.size >= 2) trend else List(2) { trend.firstOrNull() ?: 0f }
-                HistoryUiState(historyItems = items, trendData = safeTrend)
+        combine(repository.allPayments, repository.allPlans) { payments, plans ->
+            val nameById = plans.associate { it.id to it.name }
+            val items = payments.map { p ->
+                HistoryItem(
+                    planName = nameById[p.planId] ?: "Deleted plan",
+                    date = DateUtils.epochToDisplay(p.timestamp),
+                    amountLabel = if (p.viaRecovery) "Recovery unlock" else "KES %,d".format(p.amount),
+                    status = if (p.viaRecovery) HistoryStatus.RecoveryUsed else HistoryStatus.Saved
+                )
             }
-            // Initial value also needs >= 2 trend points so the chart never divides by zero.
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState(trendData = listOf(0f, 0f)))
 
-    private fun SavingsLogEntity.toHistoryItem(): HistoryItem = HistoryItem(
-        date = DateUtils.isoToDisplay(date),
-        targetAmount = "KES %,d".format(targetAmount),
-        savedAmount = "KES %,d".format(savedAmount),
-        status = when (status) {
-            SavingsStatus.SAVED -> HistoryStatus.Saved
-            SavingsStatus.RECOVERY_USED -> HistoryStatus.RecoveryUsed
-            else -> HistoryStatus.Missed
-        }
-    )
+            // Trend: the last 12 REAL payments (oldest -> newest), each scaled to the biggest of them.
+            val recent = payments.filter { !it.viaRecovery }
+                .sortedBy { it.timestamp }
+                .takeLast(12)
+                .map { it.amount }
+            val max = (recent.maxOrNull() ?: 0).coerceAtLeast(1)
+            val trend = recent.map { (it.toFloat() / max).coerceIn(0f, 1f) }
+            val safeTrend = if (trend.size >= 2) trend else List(2) { trend.firstOrNull() ?: 0f }
+
+            val total = payments.filter { !it.viaRecovery }.sumOf { it.amount }
+            HistoryUiState(
+                historyItems = items,
+                trendData = safeTrend,
+                totalSavedLabel = "KES %,d".format(total),
+                paymentCount = payments.count { !it.viaRecovery }
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 }

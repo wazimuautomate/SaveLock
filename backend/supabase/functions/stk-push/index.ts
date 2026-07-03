@@ -19,13 +19,15 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const phone = String(body.phone ?? "");
   const amount = Number(body.amount ?? 0);
+  // "save" or "goal" — shown as the M-Pesa account reference. Defaults to "save".
+  const accountReference = String(body.accountReference ?? "save").slice(0, 12) || "save";
   if (!/^2547\d{8}$/.test(phone) || !(amount > 0)) {
     return json({ error: "Invalid phone or amount" }, 400);
   }
 
   let result;
   try {
-    result = await initiateStkPush(phone, amount);
+    result = await initiateStkPush(phone, amount, accountReference);
   } catch (e) {
     return json({ error: "STK push error", detail: String(e) }, 502);
   }

@@ -38,6 +38,9 @@ class SaveLockRepository(
     /** All currently-active plans (Savings + Goals), newest first. Drives the Home list + lock. */
     val activePlans: Flow<List<SavingsPlanEntity>> = planDao.observeActive()
 
+    /** Every plan ever created (active or not) — used to name payments in history. */
+    val allPlans: Flow<List<SavingsPlanEntity>> = planDao.observeAll()
+
     /** Every plan payment ever made — the lock logic and progress bars read this. */
     val allPayments: Flow<List<PlanPaymentEntity>> = planPaymentDao.observeAll()
 
@@ -50,6 +53,9 @@ class SaveLockRepository(
     suspend fun getPlan(id: Long): SavingsPlanEntity? = planDao.getById(id)
 
     suspend fun createPlan(plan: SavingsPlanEntity): Long = planDao.insert(plan)
+
+    /** Edit an existing plan (keeps its id, createdAt anchor and payments). */
+    suspend fun updatePlan(plan: SavingsPlanEntity) = planDao.update(plan)
 
     /** Stop a plan and forget its payments (used for delete/complete). */
     suspend fun deletePlan(id: Long) {

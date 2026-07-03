@@ -33,6 +33,7 @@ import com.example.viewmodel.PlanRow
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToCreatePlan: () -> Unit,
+    onEditPlan: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -169,6 +170,7 @@ fun DashboardScreen(
                             viewModel.openPaymentForPlan(plan.id)
                             isSheetOpen = true
                         },
+                        onEdit = { onEditPlan(plan.id) },
                         onDelete = { deleteTarget = plan }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -273,7 +275,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onDelete: () -> Unit) {
+private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val accent = when {
         plan.isComplete -> SaveLockPrimary
         plan.isLocking -> SaveLockRed
@@ -307,8 +309,14 @@ private fun PlanCard(plan: PlanRow, onSave: () -> Unit, onDelete: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Row {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 

@@ -2,11 +2,12 @@ package com.example.data.remote.dto
 
 import com.squareup.moshi.JsonClass
 
-/** Body for POST /stk-push. */
+/** Body for POST /stk-push. [accountReference] is "save" or "goal" (M-Pesa till reference). */
 @JsonClass(generateAdapter = true)
 data class StkPushRequest(
     val phone: String,
-    val amount: Int
+    val amount: Int,
+    val accountReference: String = "save"
 )
 
 /** Response from POST /stk-push. */

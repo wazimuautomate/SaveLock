@@ -5,7 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,7 +53,7 @@ fun HistoryScreen(
         ) {
             item {
                 Text(
-                    text = "Savings History",
+                    text = "Payment History",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier.padding(vertical = 12.dp)
@@ -82,17 +82,17 @@ fun HistoryScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Last 30 Days Savings Trend",
+                                    text = "Recent Payments Trend",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Daily goal success / miss rate",
+                                    text = "${uiState.paymentCount} payment${if (uiState.paymentCount == 1) "" else "s"} so far",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            
+
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
@@ -100,7 +100,7 @@ fun HistoryScreen(
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "Target Met: 82%",
+                                    text = "Saved: ${uiState.totalSavedLabel}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SaveLockPrimary,
                                     fontWeight = FontWeight.Bold
@@ -209,7 +209,7 @@ fun HistoryScreen(
 
             item {
                 Text(
-                    text = "PAST DAYS HISTORY LOG",
+                    text = "ALL PAYMENTS",
                     style = MaterialTheme.typography.labelMedium,
                     color = SaveLockPrimary,
                     fontWeight = FontWeight.Bold,
@@ -218,12 +218,23 @@ fun HistoryScreen(
                 )
             }
 
+            if (uiState.historyItems.isEmpty()) {
+                item {
+                    Text(
+                        text = "No payments yet. Once you save toward a plan, it shows up here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+            }
+
             // Scrollable list items
-            items(uiState.historyItems) { item ->
+            itemsIndexed(uiState.historyItems) { index, item ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("history_item_${item.date.replace(" ", "_")}"),
+                        .testTag("history_item_$index"),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
@@ -234,34 +245,27 @@ fun HistoryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = item.date,
+                                text = item.planName,
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.date,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "Target: ${item.targetAmount}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "•",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Saved: ${item.savedAmount}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (item.status == HistoryStatus.Saved) SaveLockPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                text = item.amountLabel,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (item.status == HistoryStatus.Saved) SaveLockPrimary else SaveLockAmber
+                            )
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         // Status Badge
                         val (statusBg, statusBorder, statusText, statusLabel, statusIcon) = when (item.status) {

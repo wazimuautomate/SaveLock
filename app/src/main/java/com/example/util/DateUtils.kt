@@ -21,6 +21,14 @@ object DateUtils {
 
     fun parse(iso: String): LocalDate = LocalDate.parse(iso, ISO)
 
+    private val DATETIME: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM dd, yyyy • HH:mm", Locale.ENGLISH)
+
+    /** Epoch millis -> "Jul 03, 2026 • 14:05" in local time. */
+    fun epochToDisplay(millis: Long): String = runCatching {
+        java.time.Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(DATETIME)
+    }.getOrDefault("")
+
     private fun hourMinute(lockTime: String): Pair<Int, Int> {
         val parts = lockTime.split(":")
         return (parts.getOrNull(0)?.toIntOrNull() ?: 20) to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
