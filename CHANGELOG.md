@@ -6,6 +6,18 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Changed (payments + final hardening)
+- **Real M-Pesa payments** — the app now performs a genuine STK Push through the backend (to your
+  **Till / Buy Goods** number). The old demo/auto-success is gone; if the backend isn't set up yet,
+  the payment screen says so instead of pretending to succeed.
+- **Flexible plans let you type the amount** on the payment screen (blank field, must be at least the
+  minimum you set). Fixed plans still show the set amount.
+- **Harder to bypass with the power button** — after you unlock the screen, the lock re-appears on top
+  immediately, and a background check re-locks within ~1.5s if anything ever slips through.
+- **Deleting a plan keeps its payment history** — your past savings still show under History.
+- The APK is now published to the **Releases page** on each update to the main branch (no need to open
+  Actions → Artifacts).
+
 ### Changed (lock strength + UX)
 - **The lock is now far harder to bypass.** It's a full-screen overlay that stays on top of the
   home screen and recent apps, and the Back button no longer closes it. You can still type your

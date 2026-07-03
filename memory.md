@@ -11,6 +11,34 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 6: Real payments + final hardening + MERGE TO MAIN (CI GREEN, 112e2b3)
+
+- ✅ **Payments are REAL** — removed the demo/mock success. Backend not configured → clear "not set up"
+  message (no fake success). CI writes `app/savelock.properties` from **GitHub Actions secrets**
+  (`SUPABASE_FUNCTIONS_URL`, `APP_BACKEND_KEY`) so the released APK is wired to Supabase without
+  committing secrets. Verified backend loop (stk-push Till/BuyGoods → callback → status poll) + RLS-on.
+- ✅ **Flexible amount**: the pay field is now BLANK + editable (Home + lock screen); user enters any
+  amount ≥ the minimum they set (validated). Fixed plans still show the fixed amount.
+- ✅ **Power-button bypass fixed**: accessibility service re-asserts the overlay on `SCREEN_ON` /
+  `USER_PRESENT` (force re-show on top) + a 1.5s safety ticker; blocked-app surfacing re-locks on the
+  next window event. (Android 14 receiver flag `RECEIVER_NOT_EXPORTED` handled.)
+- ✅ **Delete keeps history**: `deletePlan` now only deactivates (payments kept); History still shows
+  deleted plans (names via `allPlans`/observeAll).
+- ✅ **Release APK**: CI publishes a `latest` GitHub Release on `main` → download at
+  /releases/latest (no Artifacts digging).
+- ✅ **Merged feature → main** (owner-authorized reviewed merge; overrides the never-push-main rule for
+  this explicit request). main CI builds + attaches the APK to the `latest` release.
+- ✅ Security recheck: `savelock.properties` + `backend/.env` gitignored & untracked; no secrets in
+  tracked files; backend RLS on, app-key auth on push/status; lock is soft (Safe Mode escape).
+
+⚠️ OWNER ACTIONS to make payments actually complete: (1) deploy the backend (supabase db push +
+secrets set + functions deploy — commands in backend/README.md, run from YOUR account; the token in
+this dev env is a different account), (2) add repo GitHub secrets SUPABASE_FUNCTIONS_URL +
+APP_BACKEND_KEY, (3) register the /stk-callback URL in the Daraja portal. Then re-run main CI → new APK.
+⚠️ Lock behaviour still needs an on-device test (OEM overlay/IME/Back variance).
+
+---
+
 ## 2026-07-03 — Session 5: Unbypassable lock + big UX pass (CI GREEN, commit 323e8a2)
 
 Owner feedback (one big batch). All done + CI-green across 2 commits (5651808 UX, 323e8a2 lock).
