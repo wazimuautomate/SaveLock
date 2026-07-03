@@ -6,6 +6,11 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Fixed (payment errors were hidden)
+- The payment screen used to say **"Timeout"** for almost any failure (wrong keys, wrong Daraja
+  environment, rejected push). It now shows the **real reason** from the backend/M-Pesa so a failing
+  payment can actually be diagnosed and fixed.
+
 ### Changed (lock-screen motivation)
 - **The lock screen now speaks to you.** The old generic "your distraction apps are locked out"
   line is replaced by a bold, deliberately provoking message with a supporting sub-line — and it

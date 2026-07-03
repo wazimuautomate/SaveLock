@@ -11,6 +11,30 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 8: STK timeout diagnosis + surface real payment errors
+
+- 🔎 **STK Push never reaches the phone → app says "Timeout".** Probed the live function:
+  `POST .../stk-push` with a dummy key returns OUR `{"error":"Unauthorized"}` (HTTP 401) — so the
+  function is **deployed, reachable, and verify_jwt is OFF** (gateway isn't blocking). The failure is
+  therefore INSIDE the Daraja call (creds / environment / passkey / shortcode) or a callback that
+  never lands. Can't read the Supabase secret values from here.
+- 🐛 **Root bug that hid it:** `PaymentRepository.withIoRetry` only catches `IOException`, so any HTTP
+  error (401/400/502) from `/stk-push` fell through to the outer `catch (Exception)` and was reported
+  as **`Timeout`** — masking the real cause. Fixed: now catches `HttpException`, reads the error body,
+  and returns `Failed(<real reason>)` (401→app-key mismatch, 400→bad phone/amount, 502→Daraja detail).
+  IOException → clear "couldn't reach server" message. So the NEXT on-device test will show the true
+  error text (e.g. Daraja token/env failure) instead of "Timeout".
+- ⚠️ **#1 suspect = `DARAJA_ENV`**. `_shared/daraja.ts` defaults to **sandbox** unless
+  `DARAJA_ENV=production`. `.env.example` ships `DARAJA_ENV=sandbox`. A sandbox push never prompts a
+  real phone/till → exactly the "no prompt, then timeout" symptom. Owner must set `DARAJA_ENV=production`
+  (+ production passkey/shortcode/till) on Supabase → no rebuild needed for that fix.
+- 💬 **Offline reality (unchanged locked decision):** true no-signal M-Pesa is impossible; recovery
+  code is the offline escape. The real "low/no mobile DATA" path is **C2B** (pay the till directly via
+  M-Pesa menu, works on GSM/USSD) + a Confirmation webhook, and/or **reading the M-Pesa confirmation
+  SMS** on-device to auto-unlock with zero data. Proposed to owner as next step (needs their decision).
+
+---
+
 ## 2026-07-03 — Session 7: Rotating provoking lock copy + fix backend secret name
 
 - 🐛 **Root cause of "Supabase & Daraja not set"**: the repo's GitHub Actions **URL secret was
