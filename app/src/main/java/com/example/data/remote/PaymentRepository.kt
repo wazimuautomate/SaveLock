@@ -3,6 +3,7 @@ package com.example.data.remote
 import android.util.Log
 import com.example.data.remote.dto.StkPushRequest
 import kotlinx.coroutines.delay
+import retrofit2.HttpException
 import java.io.IOException
 
 /**
@@ -29,9 +30,18 @@ class PaymentRepository(
     suspend fun pay(phone: String, amount: Int, accountReference: String, onStkSent: () -> Unit): PayResult {
         val push = try {
             withIoRetry { api.stkPush(appKey, StkPushRequest(phone, amount, accountReference)) }
+        } catch (e: HttpException) {
+            // The backend answered, but with an error (bad app key, Daraja rejected, etc.). Surface the
+            // REAL reason instead of a misleading "timeout" so the owner can see what to fix.
+            val body = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+            Log.w("PaymentRepo", "STK push HTTP ${e.code()}: $body")
+            return PayResult.Failed(describePushError(e.code(), body))
+        } catch (e: IOException) {
+            Log.w("PaymentRepo", "STK push network failure: ${e.message}")
+            return PayResult.Failed("Couldn't reach the payment server. Check your internet and try again.")
         } catch (e: Exception) {
-            Log.w("PaymentRepo", "STK push failed after retries: ${e.message}")
-            return PayResult.Timeout
+            Log.w("PaymentRepo", "STK push failed: ${e.message}")
+            return PayResult.Failed("Payment couldn't start: ${e.message ?: "unknown error"}.")
         }
 
         onStkSent()
@@ -51,6 +61,23 @@ class PaymentRepository(
             }
         }
         return PayResult.Timeout
+    }
+
+    /** Turn a backend HTTP error into a plain-English reason the owner can act on. */
+    private fun describePushError(code: Int, body: String?): String {
+        val detail = jsonField(body, "detail") ?: jsonField(body, "error") ?: body?.take(300)
+        return when (code) {
+            401 -> "Backend rejected the app key. The APP_BACKEND_KEY in the app and on Supabase must match."
+            400 -> "M-Pesa rejected the request: ${detail ?: "invalid phone number or amount"}."
+            502 -> "M-Pesa (Daraja) error: ${detail ?: "the push was rejected — check the Daraja keys/environment on Supabase"}."
+            else -> "Payment server error (HTTP $code)${detail?.let { ": $it" } ?: ""}."
+        }
+    }
+
+    /** Cheap extraction of a "field":"value" string from a small JSON error body (no parser needed). */
+    private fun jsonField(body: String?, field: String): String? {
+        body ?: return null
+        return Regex("\"$field\"\\s*:\\s*\"([^\"]*)\"").find(body)?.groupValues?.get(1)
     }
 
     private suspend fun <T> withIoRetry(block: suspend () -> T): T {
