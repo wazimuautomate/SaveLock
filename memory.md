@@ -11,6 +11,42 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 10: STK verified working + lock-screen overhaul (5 fixes)
+
+**STK CONFIRMED WORKING.** Tested live with owner's key (read from local backend/.env) to 254727921038,
+amount 1: stk-push → HTTP 200 checkoutRequestId; stk-status → FAILED "No response from user" = prompt
+DELIVERED to phone, callback loop works, no PIN entered (test). Backend/creds/DARAJA_ENV=production all
+correct on Supabase. So the earlier "timeout" = prompt arrived but PIN not entered in time. Owner confirmed
+the prompt arrived.
+
+Built all requested lock-screen fixes:
+- 🐛 **Recovery overlay-stuck bug FIXED at root**: `LockStateManager.recompute()` ran on a STALE cached
+  `payments` snapshot (Room Flow updates async), so after crediting the recovery unlock the lock still
+  evaluated active → overlay stayed. Added `LockStateManager.refreshNow()` (suspend; re-reads
+  config/plans/payments from DB then recomputes) + `PlanPaymentDao.getAll` + `repo.getAllPayments`.
+  Called from recovery success, onPaymentSucceeded, SMS receiver, C2B poller → instant unlock everywhere.
+- **Full Lockdown allow-list**: `AllowedApps` resolves SIM Toolkit (STK candidate pkgs) + default SMS +
+  default dialer. `AppBlockerAccessibilityService.shouldShowNow` FULL_LOCKDOWN now = `foreground !in
+  effectiveLockdownAllowed()` (was `true`), so ONLY those 3 (+ emergency/systemui/IME) pass; launcher/
+  recents/empty/any other app → overlay. Aggressive re-lock via existing window-change + 1.2s ticker.
+- **STK PIN over overlay**: `LockInteraction.paymentInProgress` (set by the overlay UI on
+  Requesting/WaitingForSTK) → `LockScreenController.setFocusable(false)` (FLAG_NOT_FOCUSABLE via
+  updateViewLayout) + reassert/forceReshow paused, so the system PIN dialog is usable on top; restored on
+  resolve. NOTE: device-dependent (PIN window layering) — owner to verify.
+- **Paste M-Pesa code panel**: `Panel.PasteCode` + `DashboardVM.confirmPastedMpesaCode` → `SmsInbox`
+  (READ_SMS) finds the real M-Pesa msg by code, verifies till, credits via applyExternalPayment. Can't be
+  gamed with a fake code.
+- **WiFi/data on lock screen**: `Connectivity` (hasInternet/isWifiOn/isMobileDataOn + panel intents).
+  Buttons shown only when offline AND that radio off; tapping grants Settings briefly
+  (`LockInteraction.grantSettings(60)` → settings pkg allowed for 60s) + opens the quick-panel.
+- **Allowed-app launcher icons** on the lock screen (fullLockdown) via `AllowedApps.entries`.
+- Manifest: added READ_SMS. Settings SMS toggle now requests RECEIVE_SMS+READ_SMS (RequestMultiple).
+
+⚠️ Owner to verify on-device: STK PIN visibility over the overlay (layering varies by OEM); the WiFi/data
+grant window is a deliberate 60s sanctioned bypass (only Settings allowed during it).
+
+---
+
 ## 2026-07-03 — Session 9: Offline/low-data payments — M-Pesa SMS auto-unlock + C2B webhook
 
 Owner chose "SMS + C2B (both)". Built both. **STK is still gated on the owner setting

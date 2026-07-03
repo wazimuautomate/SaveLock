@@ -74,6 +74,26 @@ object LockScreenController {
         main.post { removeOverlay(context) }
     }
 
+    /**
+     * Toggle the overlay's input focus without removing it. During an STK payment we make it
+     * NON-focusable so the system M-Pesa PIN dialog on top receives touches/keys, while the lock
+     * stays visible. Restored to focusable (swallows Back, keyboard works) once payment resolves.
+     */
+    fun setFocusable(context: Context, focusable: Boolean) {
+        main.post {
+            val v = overlay ?: return@post
+            val wm = context.getSystemService(WindowManager::class.java) ?: return@post
+            val lp = v.layoutParams as? WindowManager.LayoutParams ?: return@post
+            lp.flags = if (focusable) {
+                lp.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            } else {
+                lp.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            }
+            runCatching { wm.updateViewLayout(v, lp) }
+            if (focusable) runCatching { v.requestFocus() }
+        }
+    }
+
     private fun addOverlay(context: Context) {
         run {
             if (overlay != null) return

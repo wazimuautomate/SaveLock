@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.repository.SaveLockRepository
+import com.example.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,8 +74,11 @@ class RecoveryViewModel(private val repository: SaveLockRepository) : ViewModel(
         viewModelScope.launch {
             val ok = repository.redeemRecoveryCode(input)  // OFFLINE — no network needed
             if (ok) {
+                // Re-evaluate the lock from fresh DB state so the overlay comes down immediately
+                // (don't wait for the async Room Flow — that was leaving the lock screen stuck up).
+                ServiceLocator.lockStateManager.refreshNow()
                 entry.update { it.copy(success = true, error = null, enteredCode = "") }
-                Log.d("RecoveryVM", "Recovery code accepted; today's lock lifted.")
+                Log.d("RecoveryVM", "Recovery code accepted; lock lifted.")
             } else {
                 entry.update { it.copy(error = "Invalid or already-used recovery code.") }
             }

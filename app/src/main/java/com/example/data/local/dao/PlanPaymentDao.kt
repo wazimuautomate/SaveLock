@@ -15,6 +15,10 @@ interface PlanPaymentDao {
     @Query("SELECT * FROM plan_payment WHERE planId = :planId ORDER BY timestamp DESC")
     suspend fun getForPlan(planId: Long): List<PlanPaymentEntity>
 
+    /** One-shot read of every payment — used to refresh lock state immediately after a write. */
+    @Query("SELECT * FROM plan_payment")
+    suspend fun getAll(): List<PlanPaymentEntity>
+
     @Query("SELECT COALESCE(SUM(amount), 0) FROM plan_payment WHERE planId = :planId")
     suspend fun totalForPlan(planId: Long): Int
 

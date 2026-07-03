@@ -104,10 +104,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     var deleteTarget by remember { mutableStateOf<PlanLite?>(null) }
 
-    // Runtime RECEIVE_SMS request for offline M-Pesa auto-unlock. On grant, turn the feature on.
+    // Runtime SMS request for offline M-Pesa auto-unlock (RECEIVE_SMS to auto-detect the payment SMS;
+    // READ_SMS to verify a pasted code against the inbox). On grant, turn the feature on.
     val smsPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) viewModel.setSmsAutoUnlock(true) }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result -> if (result[Manifest.permission.RECEIVE_SMS] == true) viewModel.setSmsAutoUnlock(true) }
 
     Box(
         modifier = modifier
@@ -470,8 +471,10 @@ fun SettingsScreen(
                                 } else if (smsGranted) {
                                     viewModel.setSmsAutoUnlock(true)
                                 } else {
-                                    // Ask for RECEIVE_SMS; the launcher flips the switch on when granted.
-                                    smsPermissionLauncher.launch(Manifest.permission.RECEIVE_SMS)
+                                    // Ask for SMS access; the launcher flips the switch on when granted.
+                                    smsPermissionLauncher.launch(
+                                        arrayOf(Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS)
+                                    )
                                 }
                             },
                             colors = SwitchDefaults.colors(checkedThumbColor = androidx.compose.ui.graphics.Color.White, checkedTrackColor = SaveLockPrimary)

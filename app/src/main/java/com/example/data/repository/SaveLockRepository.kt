@@ -50,6 +50,9 @@ class SaveLockRepository(
 
     suspend fun getActivePlans(): List<SavingsPlanEntity> = planDao.getActive()
 
+    /** One-shot read of all payments (for immediate lock re-evaluation after a write). */
+    suspend fun getAllPayments(): List<PlanPaymentEntity> = planPaymentDao.getAll()
+
     suspend fun getPlan(id: Long): SavingsPlanEntity? = planDao.getById(id)
 
     suspend fun createPlan(plan: SavingsPlanEntity): Long = planDao.insert(plan)

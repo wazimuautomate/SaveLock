@@ -6,6 +6,27 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Fixed
+- **Recovery code now actually removes the lock.** Previously it said "Unlocked" but the lock screen
+  stayed up — the lock is now re-checked from fresh data the instant a code (or any payment) is
+  accepted, so the overlay comes straight down. Same fix makes STK / SMS / paste-code unlocks instant.
+
+### Added (lock-screen usability while locked)
+- **The M-Pesa PIN now shows over the lock.** During an STK payment the lock steps out of the PIN
+  dialog's way (stays visible, becomes tap-through) so you can actually enter your PIN, then re-arms.
+- **"I paid — enter M-Pesa code"** on the lock screen: paste the code from the M-Pesa SMS to confirm a
+  payment when auto-detect hasn't fired. It's checked against the real message in your inbox (a made-up
+  code won't work) and, if you set a till name, must be a payment to your till.
+- **Turn on WiFi / mobile data from the lock screen** when you're offline — the icons appear only when
+  that radio is off and there's no internet, and open the system quick-panel.
+- **Allowed-app shortcuts on the lock screen** (SIM Toolkit, Messages, Phone) so you can pay offline,
+  read the code, or dial without hunting for them.
+
+### Changed (Full Lockdown is now escape-proof)
+- In **Full Lockdown**, only **SIM Toolkit, Messages and the Phone/Dialer** (plus emergency) can be
+  opened — everything else, including the launcher and recents, is blocked, and the lock slams back the
+  instant any other app is opened (so Messages can't be used as a back door to other apps).
+
 ### Added (offline & low-data payments)
 - **Pay your till directly and unlock offline.** New **Settings → Offline M-Pesa Unlock**: enter your
   till/business name and turn on auto-unlock. Now you can pay your till straight from the phone's

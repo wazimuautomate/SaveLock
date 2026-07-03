@@ -65,7 +65,7 @@ class SaveLockForegroundService : Service() {
                                     creditedAny = true
                                 }
                             }
-                            if (creditedAny) ServiceLocator.lockStateManager.recompute()
+                            if (creditedAny) ServiceLocator.lockStateManager.refreshNow()
                         }
                         delay(20_000)
                     }

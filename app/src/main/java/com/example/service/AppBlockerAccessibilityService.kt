@@ -30,6 +30,10 @@ import kotlinx.coroutines.launch
 class AppBlockerAccessibilityService : AccessibilityService() {
 
     private var emergencyAllowed: Set<String> = emptySet()
+    // Full-lockdown allow-list: emergency/system infra + SIM Toolkit + Messages + Dialer. Nothing else.
+    private var lockdownAllowed: Set<String> = emptySet()
+    // The Settings app(s) — allowed only briefly while the user turns WiFi/data on from the lock screen.
+    private var settingsPackages: Set<String> = setOf("com.android.settings")
     private var currentForeground: String = ""
     private var lockCollector: Job? = null
     private var reassertTicker: Job? = null
@@ -45,7 +49,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        emergencyAllowed = buildEmergencyAllowList()
+        refreshAllowLists()
 
         runCatching {
             val filter = IntentFilter().apply {
@@ -66,11 +70,15 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
         // Safety net: if the overlay ever gets removed while it should be up (OEM kill, race), re-add it.
+        // Skipped while a payment is running so the re-add doesn't slam our window on top of the M-Pesa
+        // PIN dialog (see LockInteraction.paymentInProgress).
         if (reassertTicker == null) {
             reassertTicker = ServiceLocator.appScope.launch {
                 while (true) {
-                    delay(1500)
-                    if (shouldShowNow()) LockScreenController.show(this@AppBlockerAccessibilityService)
+                    delay(1200)
+                    if (!LockInteraction.paymentInProgress && shouldShowNow()) {
+                        LockScreenController.show(this@AppBlockerAccessibilityService)
+                    }
                 }
             }
         }
@@ -98,15 +106,23 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     /** Should the lock overlay be up right now? */
     private fun shouldShowNow(): Boolean {
         val lock = ServiceLocator.lockStateManager
-        return lock.isLockActiveNow() && when (lock.lockMode()) {
-            // Full lockdown: cover the phone the entire time the lock is active.
-            LockMode.FULL_LOCKDOWN -> true
+        if (!lock.isLockActiveNow()) return false
+        return when (lock.lockMode()) {
+            // Full lockdown: allow ONLY SIM Toolkit, Messages, Dialer (+ emergency/system infra, and
+            // the Settings app briefly while enabling WiFi/data). EVERY other app — and the launcher /
+            // recents / an empty foreground — is covered. This is what makes Messages un-abusable: the
+            // instant any non-allowed app comes forward, this returns true and the overlay slams back.
+            LockMode.FULL_LOCKDOWN -> currentForeground !in effectiveLockdownAllowed()
             // Chosen apps: cover only while one of the user's picked apps is in front.
             LockMode.CHOSEN_APPS -> currentForeground.isNotEmpty() &&
                 currentForeground !in emergencyAllowed &&
                 lock.shouldBlockDistractionPackage(currentForeground)
         }
     }
+
+    /** The lockdown allow-list right now (adds the Settings app only during a WiFi/data grant window). */
+    private fun effectiveLockdownAllowed(): Set<String> =
+        if (LockInteraction.settingsAllowedNow()) lockdownAllowed + settingsPackages else lockdownAllowed
 
     /** Add or remove the overlay to match [shouldShowNow]. */
     private fun updateOverlay() {
@@ -115,12 +131,23 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     /** Like [updateOverlay] but forces a fresh window on top (used after screen-on / unlock). */
     private fun reassert() {
+        // Never re-add during payment — a fresh window would cover the M-Pesa PIN dialog.
+        if (LockInteraction.paymentInProgress) return
+        refreshAllowLists() // pick up any change to the default SMS/Dialer app since connect
         if (shouldShowNow()) LockScreenController.forceReshow(this) else LockScreenController.hide(this)
+    }
+
+    /** (Re)compute the emergency + full-lockdown allow-lists. Cheap; called on connect and each tick. */
+    private fun refreshAllowLists() {
+        emergencyAllowed = buildEmergencyAllowList()
+        // Full lockdown additionally permits ONLY: SIM Toolkit (offline USSD paying), the Messages app
+        // (to read the M-Pesa code), and the Dialer (to dial *334# / make calls).
+        lockdownAllowed = emergencyAllowed + buildAllowedAppPackages()
     }
 
     /**
      * Telephony/emergency infrastructure + system UI + current keyboard + SaveLock itself. In
-     * CHOSEN_APPS these never trigger the lock. (FULL_LOCKDOWN covers everything regardless.)
+     * CHOSEN_APPS these never trigger the lock.
      */
     private fun buildEmergencyAllowList(): Set<String> {
         val allowed = mutableSetOf(
@@ -138,4 +165,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         }
         return allowed
     }
+
+    /** The three apps a locked user may open: SIM Toolkit, the default Messages app, the Dialer. */
+    private fun buildAllowedAppPackages(): Set<String> = AllowedApps.packages(this)
 }
