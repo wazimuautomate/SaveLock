@@ -62,9 +62,9 @@ class SaveLockRepository(
     }
 
     suspend fun toggleDistractionApp(packageName: String) = updateConfig { cfg ->
-        cfg.copy(distractionApps = cfg.distractionApps.map { app ->
-            if (app.packageName == packageName) app.copy(isRestricted = !app.isRestricted) else app
-        })
+        val set = cfg.restrictedPackages.toMutableSet()
+        if (!set.add(packageName)) set.remove(packageName)
+        cfg.copy(restrictedPackages = set.toList())
     }
 
     // ---- Logs / streak / balance ---------------------------------------------------------------

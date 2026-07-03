@@ -474,7 +474,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 3: Distraction Apps Block list
+            // Section 3: Distraction Apps Block list — only relevant in chosen-apps mode.
+            // Full lockdown blocks everything, so there's nothing to pick here.
+            if (uiState.lockMode == LockMode.CHOSEN_APPS) {
             Text(
                 text = "RESTRICTED DISTRACTION APPS",
                 style = MaterialTheme.typography.labelMedium,
@@ -568,6 +570,7 @@ fun SettingsScreen(
                     }
                 }
             }
+            } // end chosen-apps-only distraction section
 
             // Section 4: Emergency Emergency Actions
             Text(

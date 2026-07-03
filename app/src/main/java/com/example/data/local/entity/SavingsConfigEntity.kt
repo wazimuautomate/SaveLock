@@ -22,8 +22,8 @@ data class SavingsConfigEntity(
     val savingEnabled: Boolean = true,
     /** How strict the lock is once the deadline passes. Defaults to the gentler chosen-apps mode. */
     val lockMode: LockMode = LockMode.CHOSEN_APPS,
-    /** Candidate distraction apps with their restricted flags. */
-    val distractionApps: List<DistractionAppRecord> = defaultDistractionApps()
+    /** Package names the user chose to restrict (chosen-apps mode). Detected from the real device. */
+    val restrictedPackages: List<String> = emptyList()
 ) {
     companion object {
         const val SINGLETON_ID = 0

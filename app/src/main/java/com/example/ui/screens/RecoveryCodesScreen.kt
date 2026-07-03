@@ -49,9 +49,8 @@ fun RecoveryCodesScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // First-time users get a fresh batch generated + shown here (once). Leaving the screen hides the
-    // plaintext again — from then on only masked codes + used/unused status are visible.
-    LaunchedEffect(Unit) { viewModel.ensureCodesExist() }
+    // Leaving the screen hides any freshly-revealed plaintext again — from then on only masked codes
+    // + used/unused status are visible (they're stored as hashes, never retrievable).
     DisposableEffect(Unit) { onDispose { viewModel.clearRevealed() } }
 
     fun copyToClipboard(code: String) {
@@ -215,6 +214,25 @@ fun RecoveryCodesScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Generate: replaces (revokes) all current codes with a fresh batch, shown once here.
+            Button(
+                onClick = { viewModel.generateNewCodes() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("generate_codes_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = SaveLockPrimary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = if (uiState.codes.isEmpty()) "Generate Recovery Codes"
+                    else "Generate New Codes (replaces current)",
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -75,12 +75,10 @@ class LockStateManager(
         if (!isLockActiveNow()) return false
         return when (config.lockMode) {
             LockMode.FULL_LOCKDOWN -> true // caller already filtered out allowed/emergency packages
-            LockMode.CHOSEN_APPS ->
-                config.distractionApps.any { it.packageName == foregroundPackage && it.isRestricted }
+            LockMode.CHOSEN_APPS -> foregroundPackage in config.restrictedPackages
         }
     }
 
     /** The user's restricted-app packages (chosen-apps mode). */
-    fun restrictedPackages(): Set<String> =
-        config.distractionApps.filter { it.isRestricted }.map { it.packageName }.toSet()
+    fun restrictedPackages(): Set<String> = config.restrictedPackages.toSet()
 }

@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.LockMode
 import com.example.data.repository.SaveLockRepository
+import com.example.di.ServiceLocator
+import com.example.util.InstalledAppsProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DistractionApp(
     val packageName: String,
@@ -55,15 +59,26 @@ class SettingsViewModel(private val repository: SaveLockRepository) : ViewModel(
 
     private val transient = MutableStateFlow(Transient())
 
+    // Real apps installed on the phone, loaded once off the main thread.
+    private val installedApps = MutableStateFlow<List<InstalledAppsProvider.AppInfo>>(emptyList())
+
+    init {
+        viewModelScope.launch {
+            installedApps.value = withContext(Dispatchers.IO) {
+                InstalledAppsProvider.launchableApps(ServiceLocator.applicationContext)
+            }
+        }
+    }
+
     val uiState: StateFlow<SettingsUiState> =
-        combine(repository.config, transient) { cfg, t ->
+        combine(repository.config, transient, installedApps) { cfg, t, apps ->
             SettingsUiState(
                 dailySavingsAmount = t.amountText ?: cfg.dailyAmount.toString(),
                 lockScheduleTime = cfg.lockTime,
                 reminderLeadHours = cfg.reminderLeadHours,
                 mpesaNumber = t.mpesaText ?: cfg.mpesaNumber,
-                distractionApps = cfg.distractionApps.map {
-                    DistractionApp(it.packageName, it.name, it.isRestricted)
+                distractionApps = apps.map {
+                    DistractionApp(it.packageName, it.label, it.packageName in cfg.restrictedPackages)
                 },
                 isSavingEnabled = cfg.savingEnabled,
                 lockMode = cfg.lockMode,

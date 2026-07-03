@@ -38,6 +38,12 @@ class SaveLockForegroundService : Service() {
         if (observeJob == null) {
             observeJob = ServiceLocator.appScope.launch {
                 ServiceLocator.lockStateManager.lockActive.collect { active ->
+                    val fullLockdown = ServiceLocator.lockStateManager.lockMode() == LockMode.FULL_LOCKDOWN
+                    if (active && fullLockdown) {
+                        ShadeGuard.show(applicationContext) // block the notification shade pull-down
+                    } else {
+                        ShadeGuard.hide(applicationContext)
+                    }
                     if (!active) stopSelf()
                 }
             }
@@ -60,6 +66,7 @@ class SaveLockForegroundService : Service() {
     override fun onDestroy() {
         observeJob?.cancel()
         observeJob = null
+        ShadeGuard.hide(applicationContext)
         super.onDestroy()
     }
 

@@ -18,7 +18,7 @@ import com.example.data.local.entity.SavingsLogEntity
         SavingsLogEntity::class,
         RecoveryCodeEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -400,36 +400,6 @@ fun DashboardScreen(
                 }
             }
 
-            // Direct lockout code recovery helper link
-            Spacer(modifier = Modifier.height(24.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .clickable { onNavigateToRecoveryCode() }
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.VpnKey,
-                        contentDescription = null,
-                        tint = SaveLockAmber,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "Need emergency reset? Use Recovery Code",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = SaveLockAmber
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(80.dp)) // Extra spacing for bottom bar offset
         }
 

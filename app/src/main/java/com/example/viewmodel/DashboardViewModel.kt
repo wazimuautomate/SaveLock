@@ -112,10 +112,11 @@ class DashboardViewModel(
 
     fun updateMpesaNumber(number: String) {
         val valid = validateMpesa(number)
+        // This is the pay-FROM number for THIS payment only. It does NOT change the saved primary
+        // number in Settings — you can pay from any phone.
         payState.update {
             it.copy(phoneText = number, phoneError = if (valid) null else "Format must be 2547XXXXXXXX")
         }
-        if (valid) viewModelScope.launch { repository.setMpesaNumber(number) }
     }
 
     fun triggerPayment() {
