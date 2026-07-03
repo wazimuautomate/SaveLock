@@ -1,78 +1,85 @@
 package com.example.service
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import com.example.data.local.entity.LockMode
 import com.example.di.ServiceLocator
-import com.example.overlay.LockOverlayActivity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
- * Detects when a foreground app changes and, while the lock is active, redirects blocked apps to the
- * SaveLock lock screen.
+ * The enforcement brain. It watches which app is in the foreground and, while the lock is active,
+ * puts SaveLock's full-screen accessibility overlay on top (via [LockScreenController]).
  *
- * HARD SAFETY RULE (never remove): the telephony/emergency-call infrastructure, the system UI, the
- * current keyboard, and SaveLock itself are ALWAYS allowed. Emergency calling (via the lock screen's
- * Emergency button) must never be blockable. NOTE: in full lockdown the NORMAL phone and messaging
- * apps ARE blocked — only the system emergency dialer is reachable. The user can always escape via
- * Safe Mode, which disables this service entirely.
+ * WHY THIS IS STRONG: the overlay is a `TYPE_ACCESSIBILITY_OVERLAY` window that floats above the
+ * launcher, recents, the status/nav bars and system dialogs, and it is focusable so it swallows the
+ * Back key. In FULL_LOCKDOWN it stays up the entire time the lock is active, so Home / Recents / Back
+ * cannot reveal anything. In CHOSEN_APPS it appears only over the apps the user picked.
+ *
+ * SAFETY: this is still a soft lock — Safe Mode disables the accessibility service (removing the
+ * overlay) and factory reset always wins, so SaveLock is never truly unremovable.
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
 
-    // Cached allow-list of packages that must never be blocked. Rebuilt on connect.
     private var emergencyAllowed: Set<String> = emptySet()
+    private var currentForeground: String = ""
+    private var lockCollector: Job? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         emergencyAllowed = buildEmergencyAllowList()
+        // React the instant the lock turns on/off (payment, recovery code, new period, disable).
+        if (lockCollector == null) {
+            lockCollector = ServiceLocator.appScope.launch {
+                ServiceLocator.lockStateManager.lockActive.collect { updateOverlay() }
+            }
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-
-        // Never touch our own screens (would loop) or emergency/system packages.
+        // Ignore our own overlay/app so its appearance doesn't count as "the user left the blocked app".
         if (pkg == packageName) return
-        if (pkg in emergencyAllowed) return
-
-        val lock = ServiceLocator.lockStateManager
-        if (!lock.isLockActiveNow()) return
-
-        // At this point the lock is active and the package is neither ours nor an emergency app.
-        // Chosen-apps mode: block only ticked apps. Full-lockdown: block everything else (incl. Settings).
-        if (lock.shouldBlockDistractionPackage(pkg)) {
-            bringLockScreenToFront()
-        }
+        currentForeground = pkg
+        updateOverlay()
     }
 
     override fun onInterrupt() { /* no-op */ }
 
-    private fun bringLockScreenToFront() {
-        val intent = Intent(this, LockOverlayActivity::class.java).apply {
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                    Intent.FLAG_ACTIVITY_NO_ANIMATION
-            )
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        lockCollector?.cancel(); lockCollector = null
+        LockScreenController.hide(this)
+        return super.onUnbind(intent)
+    }
+
+    /** Decide whether the lock overlay should be up right now, and add/remove it accordingly. */
+    private fun updateOverlay() {
+        val lock = ServiceLocator.lockStateManager
+        val shouldShow = lock.isLockActiveNow() && when (lock.lockMode()) {
+            // Full lockdown: cover the phone the entire time the lock is active.
+            LockMode.FULL_LOCKDOWN -> true
+            // Chosen apps: cover only while one of the user's picked apps is in front.
+            LockMode.CHOSEN_APPS -> currentForeground.isNotEmpty() &&
+                currentForeground !in emergencyAllowed &&
+                lock.shouldBlockDistractionPackage(currentForeground)
         }
-        // Requires the "Display over other apps" permission to launch from the background reliably.
-        runCatching { startActivity(intent) }
+        if (shouldShow) LockScreenController.show(this) else LockScreenController.hide(this)
     }
 
     /**
-     * Builds the ALWAYS-allowed set: telephony/emergency infrastructure + system UI + current
-     * keyboard + SaveLock itself. The NORMAL dialer/SMS apps are intentionally NOT here, so full
-     * lockdown blocks them too — only the system emergency dialer (com.android.phone) stays reachable.
+     * Telephony/emergency infrastructure + system UI + current keyboard + SaveLock itself. In
+     * CHOSEN_APPS these never trigger the lock. (FULL_LOCKDOWN covers everything regardless.)
      */
     private fun buildEmergencyAllowList(): Set<String> {
         val allowed = mutableSetOf(
             "com.android.systemui",
-            "com.android.phone",          // telephony service + system emergency dialer
-            "com.android.server.telecom", // in-call UI during an emergency call
-            "com.android.emergency",      // emergency info app
+            "com.android.phone",
+            "com.android.server.telecom",
+            "com.android.emergency",
             packageName
         )
-        // Current keyboard (so typing a recovery code always works)
         runCatching {
             Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
                 ?.substringBefore('/')

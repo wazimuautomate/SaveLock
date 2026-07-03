@@ -60,14 +60,8 @@
                 android:value="Personal savings-discipline app lock supervised for the current day" />
         </service>
 
-        <!-- The lock screen, brought to front by the accessibility service -->
-        <activity
-            android:name=".overlay.LockOverlayActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTask"
-            android:taskAffinity=""
-            android:theme="@style/Theme.MyApplication" />
+        <!-- The lock screen is a full-screen accessibility overlay (LockScreenController), not an
+             Activity — so Home/Recents/Back cannot dismiss it. No Activity registration needed. -->
 
         <!-- Detects the foreground app to enforce the soft-lock -->
         <service

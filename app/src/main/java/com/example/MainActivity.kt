@@ -202,30 +202,20 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 6. Lockout Overlay Screen (Simulated lockout view)
+                        // 6. Lock screen PREVIEW (the real one is a system overlay, not a screen).
                         composable(Screen.LockOverlay.route) {
                             val overlayDash by dashboardViewModel.uiState.collectAsState()
-                            // Auto-leave the (simulated) lock once a payment succeeds, like the real one.
+                            // Auto-leave the preview once a payment succeeds, like the real overlay does.
                             LaunchedEffect(overlayDash.paymentStatus) {
                                 if (overlayDash.paymentStatus is PaymentStatus.Success) {
                                     kotlinx.coroutines.delay(1200)
                                     navController.popBackStack(Screen.Dashboard.route, inclusive = false)
                                 }
                             }
-                            OverlayScreen(
-                                viewModel = lockOverlayViewModel,
+                            LockScreenContent(
                                 dashboardViewModel = dashboardViewModel,
-                                onNavigateToRecoveryEntry = {
-                                    navController.navigate(Screen.RecoveryCodeEntry.route)
-                                },
-                                onOpenEmergency = {
-                                    runCatching {
-                                        context.startActivity(
-                                            android.content.Intent("com.android.phone.EmergencyDialer.DIAL")
-                                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
-                                    }
-                                }
+                                lockViewModel = lockOverlayViewModel,
+                                recoveryViewModel = recoveryViewModel
                             )
                         }
                     }
