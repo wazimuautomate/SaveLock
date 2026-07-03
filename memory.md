@@ -11,6 +11,43 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-03 — Session 1 (later): FULL FEATURE BUILD COMPLETE ✅ (CI green throughout)
+
+All 14 planned todos are done and every batch was verified compiling via GitHub Actions.
+
+**Built & pushed (all on `feature`):**
+- Recovery screens wired (generate reveals plaintext once, then masked; offline redeem). History
+  chart guarded against <2 points.
+- Scheduling: `AlarmScheduler` (exact daily alarm + WorkManager reminders), `LockCheckReceiver`,
+  `BootReceiver`, `ReminderWorker`, `LockStateManager` (live lock decision). Application re-arms on
+  startup + on schedule-setting changes.
+- `SaveLockForegroundService` (special-use FGS, crash-safe start) + notification channels/builders.
+- `AppBlockerAccessibilityService` (redirects blocked apps; HARD emergency allow-list:
+  dialer/SMS/systemUI/keyboard/self) + `LockOverlayActivity` (hosts OverlayScreen + recovery entry;
+  full-lockdown Call/Messages buttons; closes when day resolved).
+- Device Admin (`SaveLockDeviceAdminReceiver` + device_admin.xml) uninstall friction.
+- `PermissionsHelper` + Settings "Setup & Permissions" card (live status + Grant buttons).
+- Payments: `PaymentApi`/`PaymentRepository` (retry-on-weak-signal push + 60s poll) → wired into
+  DashboardViewModel (real when backend configured via `ServiceLocator.isBackendConfigured`, else demo).
+- Backend `backend/supabase`: stk-push/stk-callback/stk-status Edge Functions + `_shared/daraja.ts`,
+  `0001_init.sql` (stk_transactions, RLS on), config.toml (verify_jwt off), README (deploy + callback).
+- Manifest fully wired: permissions (boot/exact-alarm/FGS special-use/overlay/query-packages) +
+  service/receivers/activity + accessibility service + device admin.
+
+**Toolchain facts (for CI):** JDK 21 + Gradle 9.3.1; debug uses default keystore; KSP AWT NPE is
+non-fatal noise. Latest green run built the APK with everything included.
+
+**⚠️ Owner actions still needed to make it FULLY live on the phone:**
+1. Create a Supabase project; deploy `backend/` (see backend/README); register Daraja callback URL.
+2. Fill `app/savelock.properties` (SUPABASE_FUNCTIONS_URL + APP_BACKEND_KEY) and `backend/.env`.
+3. Install the APK; grant the manual permissions (Settings → Setup & Permissions card).
+Until step 1–2, payments run the DEMO flow (always succeeds, writes a real log).
+
+**Possible next polish (not blocking):** live midnight rollover for `todayLog`; nicer status-screen
+copy; app-picker for distraction apps (currently a fixed default list the user toggles).
+
+---
+
 ## 2026-07-03 — Session 1: Discovery, planning, docs, git setup
 
 **What I did**

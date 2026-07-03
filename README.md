@@ -42,10 +42,25 @@ Full internal map and the project rules are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Safety boundary (please read)
 
-SaveLock is a **soft-lock**, not a device lock. By design it can **always be removed** (turn off
-Device Admin, or boot into Safe Mode, or factory reset). It **never** blocks the dialer, messages,
-or Settings. This is intentional — you must never be trapped out of your own phone in an emergency.
-No sideloaded app can be made truly unremovable without wiping the phone.
+SaveLock is a **soft-lock**, not a device lock. By design it can **always be removed**. In
+*Chosen apps* mode it never blocks the dialer, messages, or Settings. In *Full lockdown* mode it
+blocks everything except **phone calls and messages** (Settings included) — but emergency calling
+always works, and you can always escape with **Safe Mode** (below). This is intentional: you must
+never be permanently trapped out of your own phone. No sideloaded app can be made truly unremovable
+without wiping the phone.
+
+### 🆘 How to escape / get out (always works)
+1. **Save** via M-Pesa, or
+2. Enter a **recovery code** (works offline), or
+3. **Safe Mode** — the guaranteed way out if you're ever stuck:
+   - Press and hold the **power button**.
+   - Press and **hold** the on-screen **"Power off"** until "Reboot to safe mode" appears → tap **OK**.
+   - In Safe Mode, SaveLock's lock is fully disabled (accessibility services don't run), so you can
+     open Settings, turn things off, or uninstall. Restart normally to exit Safe Mode.
+   - (Exact steps vary slightly by phone; search "safe mode <your phone model>" if needed.)
+
+> ⚠️ In **Full lockdown**, if you ever lose your recovery codes AND can't pay, Safe Mode is your only
+> way out — so keep your 10 recovery codes written down somewhere safe.
 
 ---
 

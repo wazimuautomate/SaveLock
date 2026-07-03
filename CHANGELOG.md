@@ -20,9 +20,25 @@ This project uses date-based entries (personal, non-versioned build).
 - **GitHub Actions cloud build** producing a downloadable debug APK on every push (Gradle 9.3.1).
 - Env templates: `backend/.env.example` and `app/savelock.properties.example` (→ `BuildConfig`).
 
+- **Scheduling**: exact daily lock alarm (`setExactAndAllowWhileIdle`) with boot re-arm
+  (`BootReceiver`), WorkManager lead-time reminders, and a `LockStateManager`.
+- **Foreground service** (special-use) as a resilience anchor + three notification channels
+  (reminders / status / foreground).
+- **Soft-lock**: `AppBlockerAccessibilityService` redirects blocked apps to a `LockOverlayActivity`,
+  with a hard emergency allow-list (dialer/SMS/system UI/keyboard/self) that can never be blocked.
+- **Device Admin** uninstall friction + a **Setup & Permissions** onboarding card in Settings.
+- **Payments**: `PaymentRepository` (STK push + 60s status poll + weak-signal retry) → Supabase
+  Edge Functions (`stk-push`, `stk-callback`, `stk-status`) + Postgres. Real flow when the backend
+  is configured, demo flow otherwise. On success: writes the log, notifies, clears the lock.
+- **Supabase backend project** under `backend/` with deploy README and Daraja callback URL.
+
 ### Changed
 - Removed unused Firebase / Gemini / App-Check / secrets-gradle code (lighter app); added WorkManager.
 - Debug builds now use the default auto-generated keystore (so any machine/CI can build).
+
+### Notes
+- Full lockdown blocks Settings too (owner's choice); escape via pay / recovery code / Safe Mode.
+  Emergency calls are never blockable. See README "How to escape".
 
 ### Planned (next)
 - Room data layer (SavingsConfig, SavingsLog, RecoveryCode) + repository exposing Flows.
