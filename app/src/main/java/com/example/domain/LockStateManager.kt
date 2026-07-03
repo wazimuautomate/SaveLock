@@ -60,6 +60,19 @@ class LockStateManager(
         return active
     }
 
+    /**
+     * Re-read config/plans/payments straight from the DB, then recompute. Use this right after a write
+     * that should lift the lock (payment, recovery code, SMS/C2B credit) — [recompute] alone can run on
+     * a still-stale cached snapshot because the Room Flows update asynchronously, which previously left
+     * the lock overlay up even after "Unlocked". Returns the fresh lock-active flag.
+     */
+    suspend fun refreshNow(): Boolean {
+        config = repository.getConfig()
+        plans = repository.getActivePlans()
+        payments = repository.getAllPayments()
+        return recompute()
+    }
+
     /** Lock is active when saving is enabled AND at least one active plan is due-and-unpaid now. */
     fun isLockActiveNow(): Boolean {
         if (!config.savingEnabled) return false

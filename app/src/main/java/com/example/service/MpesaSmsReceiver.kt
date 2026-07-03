@@ -43,7 +43,7 @@ class MpesaSmsReceiver : BroadcastReceiver() {
 
                 val credited = ServiceLocator.repository.applyExternalPayment(parsed.receipt, parsed.amount)
                 if (credited) {
-                    ServiceLocator.lockStateManager.recompute()
+                    ServiceLocator.lockStateManager.refreshNow()
                     NotificationManagerHelper.clearLockActive(context)
                     NotificationManagerHelper.showPaymentResult(context, success = true, amount = parsed.amount)
                     Log.i("MpesaSmsReceiver", "Auto-unlocked from M-Pesa SMS (${parsed.receipt}, KES ${parsed.amount}).")

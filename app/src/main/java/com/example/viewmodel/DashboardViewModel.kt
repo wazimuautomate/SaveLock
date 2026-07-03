@@ -33,6 +33,14 @@ sealed interface PaymentStatus {
     object Timeout : PaymentStatus
 }
 
+/** State of "paste your M-Pesa code to confirm" on the lock screen. */
+sealed interface PasteStatus {
+    object Idle : PasteStatus
+    object Checking : PasteStatus
+    object Success : PasteStatus
+    data class Failed(val message: String) : PasteStatus
+}
+
 /** One row on the Home screen: a Savings or Goal with its live progress + what to pay now. */
 data class PlanRow(
     val id: Long,
@@ -98,6 +106,10 @@ class DashboardViewModel(
     )
 
     private val payState = MutableStateFlow(PayState())
+
+    private val _pasteStatus = MutableStateFlow<PasteStatus>(PasteStatus.Idle)
+    /** "Paste M-Pesa code" flow on the lock screen (separate from the STK payment sheet). */
+    val pasteStatus: StateFlow<PasteStatus> = _pasteStatus
 
     // Emits every minute so period progress / lock status stays fresh even with no interaction.
     private val ticker = flow {
@@ -379,7 +391,7 @@ class DashboardViewModel(
         val ctx = ServiceLocator.applicationContext
         NotificationManagerHelper.showPaymentResult(ctx, success = true, amount = amount)
         // Only clear the persistent lock notification if nothing else is still locking.
-        if (!ServiceLocator.lockStateManager.recompute()) {
+        if (!ServiceLocator.lockStateManager.refreshNow()) {
             NotificationManagerHelper.clearLockActive(ctx)
             AlarmScheduler.cancelReminders(ctx)
         }
@@ -388,5 +400,48 @@ class DashboardViewModel(
 
     fun resetPaymentState() {
         payState.update { it.copy(paymentStatus = PaymentStatus.Idle) }
+    }
+
+    /**
+     * Confirm a payment by pasting its M-Pesa code (offline fallback when auto-SMS-unlock didn't fire).
+     * The code is verified against the REAL M-Pesa message in the inbox — a made-up code won't work —
+     * and, if a till name is set, must be a payment to that till. On success it credits the due plans.
+     */
+    fun confirmPastedMpesaCode(code: String) {
+        viewModelScope.launch {
+            val trimmed = code.trim()
+            if (trimmed.isEmpty()) {
+                _pasteStatus.value = PasteStatus.Failed("Enter the M-Pesa code from your message.")
+                return@launch
+            }
+            _pasteStatus.value = PasteStatus.Checking
+            val ctx = ServiceLocator.applicationContext
+            val parsed = com.example.util.SmsInbox.findMpesaByCode(ctx, trimmed)
+            if (parsed == null) {
+                _pasteStatus.value = PasteStatus.Failed(
+                    "No M-Pesa payment with that code was found in your Messages. Check the code and that SMS access is granted."
+                )
+                return@launch
+            }
+            val cfg = repository.getConfig()
+            if (cfg.tillName.isNotBlank() &&
+                !com.example.domain.MpesaPaymentSms.matchesTill(parsed, cfg.tillName)
+            ) {
+                _pasteStatus.value = PasteStatus.Failed("That payment wasn't to your till (${cfg.tillName}).")
+                return@launch
+            }
+            val credited = repository.applyExternalPayment(parsed.receipt, parsed.amount)
+            if (credited) {
+                ServiceLocator.lockStateManager.refreshNow()
+                NotificationManagerHelper.showPaymentResult(ctx, success = true, amount = parsed.amount)
+                _pasteStatus.value = PasteStatus.Success
+            } else {
+                _pasteStatus.value = PasteStatus.Failed("That code was already applied, or no payment is currently due.")
+            }
+        }
+    }
+
+    fun resetPasteStatus() {
+        _pasteStatus.value = PasteStatus.Idle
     }
 }
