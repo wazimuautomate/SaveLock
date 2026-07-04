@@ -2,6 +2,7 @@ package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.widget.Toast
 import com.example.data.local.entity.AmountType
 import com.example.data.local.entity.LockMode
 import com.example.data.local.entity.PeriodType
@@ -14,6 +15,7 @@ import com.example.domain.PlanLogic
 import com.example.scheduling.AlarmScheduler
 import com.example.service.SaveLockForegroundService
 import com.example.util.NotificationManagerHelper
+import com.example.util.PermissionsHelper
 import com.example.util.PhoneUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -260,13 +262,23 @@ class DashboardViewModel(
     /** Arm SaveLock manually. Creating a plan alone never starts enforcement. */
     fun startLocking() {
         viewModelScope.launch {
+            val ctx = ServiceLocator.applicationContext
+            if (!PermissionsHelper.isDeviceAdminActive(ctx)) {
+                Toast.makeText(
+                    ctx,
+                    "Turn on uninstall protection, then tap Start locking again.",
+                    Toast.LENGTH_LONG
+                ).show()
+                PermissionsHelper.requestDeviceAdmin(ctx)
+                return@launch
+            }
             repository.setSavingEnabled(true)
             repository.setLockMode(LockMode.FULL_LOCKDOWN)
             repository.setLockStarted(true)
-            AlarmScheduler.rescheduleAll(ServiceLocator.applicationContext)
+            AlarmScheduler.rescheduleAll(ctx)
             if (ServiceLocator.lockStateManager.refreshNow()) {
-                SaveLockForegroundService.start(ServiceLocator.applicationContext)
-                NotificationManagerHelper.showLockActive(ServiceLocator.applicationContext, 0)
+                SaveLockForegroundService.start(ctx)
+                NotificationManagerHelper.showLockActive(ctx, 0)
             }
         }
     }
