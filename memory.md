@@ -544,3 +544,16 @@ copy; app-picker for distraction apps (currently a fixed default list the user t
 - All 3 functions ACTIVE, verify_jwt=false: stk-push (401 without x-app-key ✓),
   stk-status (405 on POST, expects GET ✓), stk-callback (public, returned ResultCode 0 "Ignored" ✓).
 - Backend is now fully live: schema + secrets + functions. App can call stk-push once wired.
+
+## Session 2026-07-04 — STK prompt no longer hidden by lock overlay
+- Problem: when the user sent an STK push from the lock screen, the M-Pesa PIN prompt could be
+  present but hidden under SaveLock's `TYPE_APPLICATION_OVERLAY`.
+- Fix: replaced focus-only overlay handling with `LockScreenController.setPaymentPromptMode()`.
+  During `PaymentStatus.Requesting` / `WaitingForSTK`, the overlay remains attached but becomes
+  alpha 0 + `FLAG_NOT_FOCUSABLE` + `FLAG_NOT_TOUCHABLE`, so the phone's M-Pesa prompt is visible
+  and tappable while the payment state keeps flowing.
+- Enforcement guard: `LockInteraction` now owns the payment-in-progress state, a 90-second prompt
+  grace window, and a small M-Pesa/STK/system payment-surface allow list. `AppBlockerAccessibilityService`
+  keeps the prompt mode only for that window or recognized payment surfaces, then restores the lock.
+- Files changed: `LockScreenController.kt`, `LockScreenContent.kt`, `LockInteraction.kt`,
+  `AppBlockerAccessibilityService.kt`, `CHANGELOG.md`, `memory.md`.

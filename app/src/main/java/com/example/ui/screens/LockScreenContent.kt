@@ -83,14 +83,20 @@ fun LockScreenContent(
         if (dash.paymentStatus != PaymentStatus.Idle) panel = Panel.Pay
     }
 
-    // While the STK PIN is being requested, let the M-Pesa PIN dialog show ON TOP of the lock: make
-    // the overlay non-focusable and pause its re-assert so it isn't slammed over the prompt. Restored
-    // the moment the payment resolves. The phone still looks locked; no other app becomes reachable.
+    // While the STK PIN is being requested, let the M-Pesa PIN dialog show and receive touches. The
+    // overlay stays attached but becomes invisible/tap-through, then restores as soon as payment
+    // leaves the in-progress state.
     LaunchedEffect(dash.paymentStatus) {
         val inProgress = dash.paymentStatus == PaymentStatus.Requesting ||
             dash.paymentStatus == PaymentStatus.WaitingForSTK
-        LockInteraction.paymentInProgress = inProgress
-        LockScreenController.setFocusable(context, !inProgress)
+        LockInteraction.setPaymentInProgress(inProgress)
+        LockScreenController.setPaymentPromptMode(context, inProgress)
+    }
+    DisposableEffect(context) {
+        onDispose {
+            LockInteraction.setPaymentInProgress(false)
+            LockScreenController.setPaymentPromptMode(context, enabled = false)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

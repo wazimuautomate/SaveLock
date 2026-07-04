@@ -6,6 +6,13 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Fixed (M-Pesa STK prompt visibility)
+- **The M-Pesa STK PIN prompt is no longer hidden behind the lock screen.** During an in-progress
+  STK payment, the lock overlay now stays attached but becomes invisible and tap-through, so the
+  system M-Pesa prompt can appear and accept the PIN. The lock re-arms when the payment flow leaves
+  the in-progress state, and the accessibility service only keeps this pass-through window for the
+  payment prompt grace period or recognized M-Pesa/STK system surfaces.
+
 ### Fixed (whitelisted apps and keyboard)
 - **Keyboard/IME packages are no longer treated as blocked foreground apps.** SaveLock ignores the
   active keyboard package so recovery-code entry, M-Pesa number entry, and M-Pesa PIN entry are not
