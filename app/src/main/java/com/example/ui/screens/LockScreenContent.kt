@@ -115,6 +115,7 @@ fun LockScreenContent(
 
             Panel.Pay -> Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 PaymentSheetContent(
@@ -128,6 +129,7 @@ fun LockScreenContent(
                         dashboardViewModel.resetPaymentState()
                         panel = Panel.Main
                     },
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 520.dp),
                     editableAmount = dash.payIsFlexible,
                     amountText = dash.payAmountText,
                     minAmount = dash.payMinAmount,

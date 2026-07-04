@@ -149,6 +149,10 @@ fun DashboardScreen(
             if (!uiState.hasPlans) {
                 EmptyPlansCard()
             } else {
+                if (!uiState.isLockStarted) {
+                    StartLockingCard(onStart = { viewModel.startLocking() })
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
                 uiState.plans.forEach { plan ->
                     PlanCard(
                         plan = plan,
@@ -171,20 +175,63 @@ fun DashboardScreen(
                 onDismissRequest = { isSheetOpen = false; viewModel.resetPaymentState() },
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ) {
-                PaymentSheetContent(
-                    amount = uiState.chargeAmount,
-                    phoneNumber = uiState.mpesaNumber,
-                    paymentStatus = uiState.paymentStatus,
-                    phoneError = uiState.paymentPhoneError,
-                    onPhoneChange = { viewModel.updateMpesaNumber(it) },
-                    onSendRequest = { viewModel.triggerPayment() },
-                    onDismiss = { isSheetOpen = false; viewModel.resetPaymentState() },
-                    editableAmount = uiState.payIsFlexible,
-                    amountText = uiState.payAmountText,
-                    minAmount = uiState.payMinAmount,
-                    amountError = uiState.paymentAmountError,
-                    onAmountChange = { viewModel.updatePayAmount(it) }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    PaymentSheetContent(
+                        amount = uiState.chargeAmount,
+                        phoneNumber = uiState.mpesaNumber,
+                        paymentStatus = uiState.paymentStatus,
+                        phoneError = uiState.paymentPhoneError,
+                        onPhoneChange = { viewModel.updateMpesaNumber(it) },
+                        onSendRequest = { viewModel.triggerPayment() },
+                        onDismiss = { isSheetOpen = false; viewModel.resetPaymentState() },
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 520.dp),
+                        editableAmount = uiState.payIsFlexible,
+                        amountText = uiState.payAmountText,
+                        minAmount = uiState.payMinAmount,
+                        amountError = uiState.paymentAmountError,
+                        onAmountChange = { viewModel.updatePayAmount(it) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StartLockingCard(onStart: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SaveLockRed.copy(alpha = 0.08f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = SaveLockRed, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "Locking is not started",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = SaveLockRed
                 )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Your plans are saved, but SaveLock will not cover the phone until you start locking.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Button(
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("start_locking_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = SaveLockRed),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Start locking now", fontWeight = FontWeight.Bold)
             }
         }
     }

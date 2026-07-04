@@ -73,9 +73,10 @@ class LockStateManager(
         return recompute()
     }
 
-    /** Lock is active when saving is enabled AND at least one active plan is due-and-unpaid now. */
+    /** Lock is active when saving is enabled, armed, and at least one active plan is due-and-unpaid. */
     fun isLockActiveNow(): Boolean {
         if (!config.savingEnabled) return false
+        if (!config.lockStarted) return false
         val now = System.currentTimeMillis()
         return plans.any { PlanLogic.isLockingNow(it, payments, now) }
     }

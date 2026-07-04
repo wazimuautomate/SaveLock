@@ -6,6 +6,17 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Changed (Samsung A05 lock hardening)
+- **Locking now starts only when you tap "Start locking now".** Creating a Savings plan or Goal saves
+  it, but does not automatically arm the lock. Starting the lock also switches enforcement to Full
+  Lockdown so only SIM Toolkit, Messages and Phone/Dialer are usable until payment or recovery.
+- **Full Lockdown no longer treats the notification shade as an allowed app.** On Samsung A05 the
+  shade reports as `com.android.systemui`; SaveLock now reasserts the overlay instead of hiding it
+  when that system surface appears.
+- **Accessibility enforcement listens to more window/system events** so recents, notification shade,
+  and system-window changes are reacted to faster.
+- **Payment modal is centered** with a max-width content container on both Home and the lock screen.
+
 ### Fixed
 - **Lock screen crash fixed.** The latest lock-screen WiFi/data buttons checked network and WiFi state
   while the overlay was opening, but the app did not declare the harmless state-read permissions Android

@@ -20,6 +20,8 @@ data class SavingsConfigEntity(
     val mpesaNumber: String = "",
     /** Master switch: when false, no locks/reminders fire. */
     val savingEnabled: Boolean = true,
+    /** User-controlled arming switch: plans do not enforce until the user taps Start locking. */
+    val lockStarted: Boolean = false,
     /** How strict the lock is once the deadline passes. Defaults to the gentler chosen-apps mode. */
     val lockMode: LockMode = LockMode.CHOSEN_APPS,
     /** Package names the user chose to restrict (chosen-apps mode). Detected from the real device. */
