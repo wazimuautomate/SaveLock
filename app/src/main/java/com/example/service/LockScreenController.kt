@@ -75,22 +75,26 @@ object LockScreenController {
     }
 
     /**
-     * Toggle the overlay's input focus without removing it. During an STK payment we make it
-     * NON-focusable so the system M-Pesa PIN dialog on top receives touches/keys, while the lock
-     * stays visible. Restored to focusable (swallows Back, keyboard works) once payment resolves.
+     * During an STK payment the M-Pesa PIN prompt is a system/telephony surface below application
+     * overlays on some phones. Focus changes alone are not enough: the lock can still visually cover
+     * the prompt. Keep the overlay attached so payment state keeps flowing, but make it invisible and
+     * tap-through until the payment leaves the in-progress state.
      */
-    fun setFocusable(context: Context, focusable: Boolean) {
+    fun setPaymentPromptMode(context: Context, enabled: Boolean) {
         main.post {
             val v = overlay ?: return@post
             val wm = context.getSystemService(WindowManager::class.java) ?: return@post
             val lp = v.layoutParams as? WindowManager.LayoutParams ?: return@post
-            lp.flags = if (focusable) {
-                lp.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            val promptFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            lp.flags = if (enabled) {
+                lp.flags or promptFlags
             } else {
-                lp.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                lp.flags and promptFlags.inv()
             }
+            lp.alpha = if (enabled) 0f else 1f
             runCatching { wm.updateViewLayout(v, lp) }
-            if (focusable) runCatching { v.requestFocus() }
+            if (!enabled) runCatching { v.requestFocus() }
         }
     }
 

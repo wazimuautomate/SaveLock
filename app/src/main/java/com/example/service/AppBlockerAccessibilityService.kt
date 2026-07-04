@@ -72,15 +72,26 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 ServiceLocator.lockStateManager.lockActive.collect { updateOverlay() }
             }
         }
-        // Safety net: if the overlay ever gets removed while it should be up (OEM kill, race), re-add it.
-        // Skipped while a payment is running so the re-add doesn't slam our window on top of the M-Pesa
-        // PIN dialog (see LockInteraction.paymentInProgress).
+        // Safety net: if the overlay ever gets removed while it should be up (OEM kill, race), re-add
+        // it. During payment this keeps the overlay attached in invisible/tap-through prompt mode, so
+        // the M-Pesa PIN surface stays usable.
         if (reassertTicker == null) {
             reassertTicker = ServiceLocator.appScope.launch {
                 while (true) {
                     delay(1200)
                     refreshAllowLists()
-                    if (!LockInteraction.paymentInProgress && shouldShowNow()) {
+                    if (LockInteraction.paymentInProgress && ServiceLocator.lockStateManager.isLockActiveNow()) {
+                        if (LockInteraction.shouldHoldPaymentPrompt(currentForeground)) {
+                            LockScreenController.show(this@AppBlockerAccessibilityService)
+                            LockScreenController.setPaymentPromptMode(this@AppBlockerAccessibilityService, true)
+                        } else {
+                            LockInteraction.setPaymentInProgress(false)
+                            LockScreenController.setPaymentPromptMode(this@AppBlockerAccessibilityService, false)
+                            if (shouldShowNow()) {
+                                LockScreenController.show(this@AppBlockerAccessibilityService)
+                            }
+                        }
+                    } else if (shouldShowNow()) {
                         LockScreenController.show(this@AppBlockerAccessibilityService)
                     }
                 }
@@ -142,13 +153,27 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     /** Add or remove the overlay to match [shouldShowNow]. */
     private fun updateOverlay() {
+        if (LockInteraction.paymentInProgress && ServiceLocator.lockStateManager.isLockActiveNow()) {
+            if (LockInteraction.shouldHoldPaymentPrompt(currentForeground)) {
+                LockScreenController.show(this)
+                LockScreenController.setPaymentPromptMode(this, true)
+                return
+            }
+            LockInteraction.setPaymentInProgress(false)
+            LockScreenController.setPaymentPromptMode(this, false)
+        }
         if (shouldShowNow()) LockScreenController.show(this) else LockScreenController.hide(this)
     }
 
     /** Like [updateOverlay] but forces a fresh window on top (used after screen-on / unlock). */
     private fun reassert(forceLock: Boolean) {
-        // Never re-add during payment — a fresh window would cover the M-Pesa PIN dialog.
-        if (LockInteraction.paymentInProgress) return
+        // Never re-add during the valid payment prompt window — a fresh window would cover the M-Pesa
+        // PIN dialog. If the window expired, restore the overlay before normal reassert logic.
+        if (LockInteraction.paymentInProgress) {
+            if (LockInteraction.shouldHoldPaymentPrompt(currentForeground)) return
+            LockInteraction.setPaymentInProgress(false)
+            LockScreenController.setPaymentPromptMode(this, false)
+        }
         refreshAllowLists() // pick up any change to the default SMS/Dialer app since connect
         if (forceLock && ServiceLocator.lockStateManager.isLockActiveNow()) {
             // Critical Samsung A05 path: user opens Settings from the phone lock screen, enters the
