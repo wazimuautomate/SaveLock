@@ -26,7 +26,7 @@ import com.example.data.local.entity.SavingsPlanEntity
         SavingsPlanEntity::class,
         PlanPaymentEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,6 +53,16 @@ abstract class SaveLockDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v4 -> v5: locks are no longer auto-armed by creating a plan. The user must press
+         * Start locking once they are ready for SaveLock to enforce due plans.
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE savings_config ADD COLUMN lockStarted INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(context: Context): SaveLockDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -60,7 +70,7 @@ abstract class SaveLockDatabase : RoomDatabase() {
                     SaveLockDatabase::class.java,
                     "savelock.db"
                 )
-                    .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     // Personal app, single user: destructive fallback stays as a backstop only if we
                     // ever bump the version WITHOUT providing a migration above.
                     .fallbackToDestructiveMigration(dropAllTables = true)

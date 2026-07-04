@@ -11,6 +11,40 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-04 — Session 12: Samsung A05 lock hardening + manual Start Locking
+
+Owner moved testing from Samsung A06 to Samsung A05 and reported the lock overlay was unstable:
+it popped/disappeared, notification shade was reachable, other apps could be accessed from there,
+and the payment sheet was visually shifted left. Owner also requested web research and GitHub
+Actions build verification instead of local Gradle.
+
+Research/Android limit:
+- Android's status bar/notification shade is system UI, and normal sideloaded apps cannot truly own
+  that layer like a device-owner kiosk app. The practical fix is to keep SaveLock as a soft-lock and
+  make the accessibility/service loop reassert aggressively when SystemUI or another app appears.
+
+Fix:
+- Added `SavingsConfigEntity.lockStarted` with DB v4->v5 migration. Creating a plan now saves it but
+  disarms enforcement; the user must tap Home's new "Start locking now" button.
+- `DashboardViewModel.startLocking()` sets saving enabled, switches to `FULL_LOCKDOWN`, sets
+  `lockStarted=true`, reschedules alarms, refreshes lock state, starts the foreground service, and
+  shows the lock-active notification if any due plan is unpaid.
+- `LockStateManager` and `AlarmScheduler` require both `savingEnabled` and `lockStarted`; no automatic
+  lock after creating a Savings plan or Goal.
+- `AppBlockerAccessibilityService` no longer includes `com.android.systemui` in the Full Lockdown
+  allow-list. This targets the A05 notification-shade bypass where SystemUI events made the overlay
+  hide. Chosen-apps mode still ignores SystemUI so normal notifications do not trigger chosen-app locks.
+- Accessibility config now listens for window state, windows changed, window content changed, and
+  notification state events with zero notification timeout for faster reassertion.
+- Payment sheet content is centered and constrained to 520dp on Home and lock-screen payment panels.
+
+Verification:
+- `git diff --check` passed.
+- Local Gradle build was intentionally abandoned per owner instruction; use GitHub Actions for APK
+  verification after push.
+
+---
+
 ## 2026-07-04 — Session 11: Fixed lock-screen crash from connectivity status permissions
 
 Owner reported the lock page does not appear; when it is about to appear, SaveLock closes completely.

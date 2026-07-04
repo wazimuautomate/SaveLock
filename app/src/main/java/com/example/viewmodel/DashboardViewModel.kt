@@ -3,6 +3,7 @@ package com.example.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.AmountType
+import com.example.data.local.entity.LockMode
 import com.example.data.local.entity.PeriodType
 import com.example.data.local.entity.PlanType
 import com.example.data.local.entity.SavingsPlanEntity
@@ -11,6 +12,7 @@ import com.example.data.repository.SaveLockRepository
 import com.example.di.ServiceLocator
 import com.example.domain.PlanLogic
 import com.example.scheduling.AlarmScheduler
+import com.example.service.SaveLockForegroundService
 import com.example.util.NotificationManagerHelper
 import com.example.util.PhoneUtils
 import kotlinx.coroutines.delay
@@ -65,6 +67,7 @@ data class PlanRow(
 data class DashboardUiState(
     val totalSaved: String = "KES 0",
     val isSavingEnabled: Boolean = true,
+    val isLockStarted: Boolean = false,
     val plans: List<PlanRow> = emptyList(),
     val hasPlans: Boolean = false,
     val activeLocks: Int = 0,
@@ -128,12 +131,14 @@ class DashboardViewModel(
             payState
         ) { cfg, plans, payments, _, pay ->
             val now = System.currentTimeMillis()
-            val rows = plans.map { plan -> buildRow(plan, payments, now) }
+            val enforcementStarted = cfg.savingEnabled && cfg.lockStarted
+            val rows = plans.map { plan -> buildRow(plan, payments, now, enforcementStarted) }
             val total = payments.filter { !it.viaRecovery }.sumOf { it.amount }
             val target = pay.targetPlanId?.let { id -> rows.firstOrNull { it.id == id } }
             DashboardUiState(
                 totalSaved = "KES %,d".format(total),
                 isSavingEnabled = cfg.savingEnabled,
+                isLockStarted = cfg.lockStarted,
                 plans = rows,
                 hasPlans = rows.isNotEmpty(),
                 activeLocks = rows.count { it.isLocking },
@@ -153,11 +158,13 @@ class DashboardViewModel(
     private fun buildRow(
         plan: SavingsPlanEntity,
         payments: List<com.example.data.local.entity.PlanPaymentEntity>,
-        now: Long
+        now: Long,
+        enforcementStarted: Boolean
     ): PlanRow {
         val required = PlanLogic.requiredAmount(plan)
         val paidThisPeriod = PlanLogic.currentPeriodPaid(plan, payments, now)
-        val locking = PlanLogic.isLockingNow(plan, payments, now)
+        val dueNow = PlanLogic.isLockingNow(plan, payments, now)
+        val locking = enforcementStarted && dueNow
         val complete = PlanLogic.isGoalCompleted(plan, payments, now)
         val totalForPlan = payments.filter { it.planId == plan.id }.sumOf { it.amount }
         val shortfall = required - paidThisPeriod
@@ -176,6 +183,7 @@ class DashboardViewModel(
         val status = when {
             complete -> "Goal complete 🎉"
             locking -> "Pay now to unlock"
+            dueNow -> "Ready — tap Start locking"
             else -> "Paid — up to date"
         }
 
@@ -246,6 +254,20 @@ class DashboardViewModel(
                     createdAt = System.currentTimeMillis()
                 )
             )
+        }
+    }
+
+    /** Arm SaveLock manually. Creating a plan alone never starts enforcement. */
+    fun startLocking() {
+        viewModelScope.launch {
+            repository.setSavingEnabled(true)
+            repository.setLockMode(LockMode.FULL_LOCKDOWN)
+            repository.setLockStarted(true)
+            AlarmScheduler.rescheduleAll(ServiceLocator.applicationContext)
+            if (ServiceLocator.lockStateManager.refreshNow()) {
+                SaveLockForegroundService.start(ServiceLocator.applicationContext)
+                NotificationManagerHelper.showLockActive(ServiceLocator.applicationContext, 0)
+            }
         }
     }
 

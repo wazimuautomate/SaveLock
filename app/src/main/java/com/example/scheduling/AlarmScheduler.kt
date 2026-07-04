@@ -56,7 +56,7 @@ object AlarmScheduler {
         val cfg = ServiceLocator.repository.getConfig()
         val plans = ServiceLocator.repository.getActivePlans()
         cancelReminders(context) // lead-time reminders were removed in favour of per-plan periods
-        if (cfg.savingEnabled && plans.isNotEmpty()) {
+        if (cfg.savingEnabled && cfg.lockStarted && plans.isNotEmpty()) {
             val now = System.currentTimeMillis()
             val next = plans.minOf { PlanLogic.nextBoundaryMillis(it, now) }
             scheduleLockCheckAt(context, next)

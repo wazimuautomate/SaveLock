@@ -55,7 +55,11 @@ class SaveLockRepository(
 
     suspend fun getPlan(id: Long): SavingsPlanEntity? = planDao.getById(id)
 
-    suspend fun createPlan(plan: SavingsPlanEntity): Long = planDao.insert(plan)
+    suspend fun createPlan(plan: SavingsPlanEntity): Long {
+        val id = planDao.insert(plan)
+        setLockStarted(false)
+        return id
+    }
 
     /** Edit an existing plan (keeps its id, createdAt anchor and payments). */
     suspend fun updatePlan(plan: SavingsPlanEntity) = planDao.update(plan)
@@ -162,6 +166,7 @@ class SaveLockRepository(
         updateConfig { it.copy(lockMode = mode) }
     suspend fun setMpesaNumber(number: String) = updateConfig { it.copy(mpesaNumber = number) }
     suspend fun setSavingEnabled(enabled: Boolean) = updateConfig { it.copy(savingEnabled = enabled) }
+    suspend fun setLockStarted(started: Boolean) = updateConfig { it.copy(lockStarted = started) }
     suspend fun setTillName(name: String) = updateConfig { it.copy(tillName = name.trim()) }
     suspend fun setSmsAutoUnlock(enabled: Boolean) = updateConfig { it.copy(smsAutoUnlockEnabled = enabled) }
 

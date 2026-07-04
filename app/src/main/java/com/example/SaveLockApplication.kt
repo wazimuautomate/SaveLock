@@ -28,12 +28,12 @@ class SaveLockApplication : Application() {
             // Arm alarms/reminders from the current config on startup.
             AlarmScheduler.rescheduleAll(this@SaveLockApplication)
 
-            // Re-arm whenever the plan set or the master enabled flag changes (a new plan means a
-            // new period boundary to watch; disabling saving cancels the alarm).
+            // Re-arm whenever the plan set or arming/enabled flags change. A new plan means a new
+            // period boundary to watch; disabling or disarming cancels the alarm.
             combine(
                 ServiceLocator.repository.activePlans,
-                ServiceLocator.repository.config.map { it.savingEnabled }.distinctUntilChanged()
-            ) { plans, enabled -> plans.map { it.id } to enabled }
+                ServiceLocator.repository.config.map { it.savingEnabled to it.lockStarted }.distinctUntilChanged()
+            ) { plans, flags -> plans.map { it.id } to flags }
                 .distinctUntilChanged()
                 .drop(1) // the initial value was already handled by the rescheduleAll above
                 .collect {

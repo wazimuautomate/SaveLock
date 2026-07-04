@@ -29,8 +29,8 @@ import kotlinx.coroutines.launch
  */
 class AppBlockerAccessibilityService : AccessibilityService() {
 
-    private var emergencyAllowed: Set<String> = emptySet()
-    // Full-lockdown allow-list: emergency/system infra + SIM Toolkit + Messages + Dialer. Nothing else.
+    private var chosenModeNeverBlocked: Set<String> = emptySet()
+    // Full-lockdown allow-list: SaveLock + keyboard + SIM Toolkit + Messages + Dialer. Nothing else.
     private var lockdownAllowed: Set<String> = emptySet()
     // The Settings app(s) — allowed only briefly while the user turns WiFi/data on from the lock screen.
     private var settingsPackages: Set<String> = setOf("com.android.settings")
@@ -85,11 +85,12 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
+        if (event == null) return
+        if (event.eventType !in WATCHED_EVENT_TYPES) return
+        val pkg = event.packageName?.toString().orEmpty()
         // Ignore our own overlay/app so its appearance doesn't count as "the user left the blocked app".
         if (pkg == packageName) return
-        currentForeground = pkg
+        if (pkg.isNotBlank()) currentForeground = pkg
         updateOverlay()
     }
 
@@ -115,7 +116,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             LockMode.FULL_LOCKDOWN -> currentForeground !in effectiveLockdownAllowed()
             // Chosen apps: cover only while one of the user's picked apps is in front.
             LockMode.CHOSEN_APPS -> currentForeground.isNotEmpty() &&
-                currentForeground !in emergencyAllowed &&
+                currentForeground !in chosenModeNeverBlocked &&
                 lock.shouldBlockDistractionPackage(currentForeground)
         }
     }
@@ -139,19 +140,24 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     /** (Re)compute the emergency + full-lockdown allow-lists. Cheap; called on connect and each tick. */
     private fun refreshAllowLists() {
-        emergencyAllowed = buildEmergencyAllowList()
-        // Full lockdown additionally permits ONLY: SIM Toolkit (offline USSD paying), the Messages app
-        // (to read the M-Pesa code), and the Dialer (to dial *334# / make calls).
-        lockdownAllowed = emergencyAllowed + buildAllowedAppPackages()
+        chosenModeNeverBlocked = buildChosenModeNeverBlocked()
+        // Full lockdown permits ONLY SaveLock infrastructure, the keyboard, SIM Toolkit (offline USSD
+        // paying), the Messages app (to read the M-Pesa code), and the Dialer (to dial *334# / calls).
+        // Do not include com.android.systemui here: on Samsung A05 the notification shade reports as
+        // SystemUI, and treating it as allowed lets the overlay disappear when the shade is pulled.
+        lockdownAllowed = buildFullLockdownAllowed() + buildAllowedAppPackages()
     }
 
     /**
-     * Telephony/emergency infrastructure + system UI + current keyboard + SaveLock itself. In
-     * CHOSEN_APPS these never trigger the lock.
+     * Telephony/emergency infrastructure + system UI + current keyboard + SaveLock itself. In chosen
+     * apps mode these never trigger the lock.
      */
-    private fun buildEmergencyAllowList(): Set<String> {
+    private fun buildChosenModeNeverBlocked(): Set<String> =
+        buildFullLockdownAllowed() + "com.android.systemui"
+
+    /** SaveLock + telephony infrastructure + current keyboard are needed while full lockdown is up. */
+    private fun buildFullLockdownAllowed(): Set<String> {
         val allowed = mutableSetOf(
-            "com.android.systemui",
             "com.android.phone",
             "com.android.server.telecom",
             "com.android.emergency",
@@ -168,4 +174,13 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     /** The three apps a locked user may open: SIM Toolkit, the default Messages app, the Dialer. */
     private fun buildAllowedAppPackages(): Set<String> = AllowedApps.packages(this)
+
+    private companion object {
+        val WATCHED_EVENT_TYPES = setOf(
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
+        )
+    }
 }
