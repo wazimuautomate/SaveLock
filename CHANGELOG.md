@@ -7,6 +7,11 @@ This project uses date-based entries (personal, non-versioned build).
 ## [Unreleased]
 
 ### Fixed
+- **Lock screen crash fixed.** The latest lock-screen WiFi/data buttons checked network and WiFi state
+  while the overlay was opening, but the app did not declare the harmless state-read permissions Android
+  requires. On some phones that throws a security error and closes SaveLock right when the lock should
+  appear. Added the missing state permissions and made those checks fail-safe, so the lock page can open
+  even if an OEM blocks one of the status APIs.
 - **Recovery code now actually removes the lock.** Previously it said "Unlocked" but the lock screen
   stayed up — the lock is now re-checked from fresh data the instant a code (or any payment) is
   accepted, so the overlay comes straight down. Same fix makes STK / SMS / paste-code unlocks instant.

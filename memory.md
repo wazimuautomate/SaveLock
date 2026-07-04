@@ -11,6 +11,28 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-04 — Session 11: Fixed lock-screen crash from connectivity status permissions
+
+Owner reported the lock page does not appear; when it is about to appear, SaveLock closes completely.
+Read `CLAUDE.md`, `AGENTS.md`, `memory.md`, and `CHANGELOG.md`, then traced the latest lock-screen
+overhaul. Root cause found in Session 10 changes: `LockScreenContent.MainPanel` now calls
+`Connectivity.hasInternet()` and `Connectivity.isWifiOn()` as soon as the overlay composes, but the
+manifest only had `INTERNET` and did not declare `ACCESS_NETWORK_STATE` / `ACCESS_WIFI_STATE`.
+Android can throw `SecurityException` for those state APIs, which kills the process exactly when the
+lock overlay is being created.
+
+Fix:
+- Added `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE` to `AndroidManifest.xml` (state-read only; no
+  secret or dangerous payment permission).
+- Wrapped the connectivity and WiFi state reads in fail-safe `runCatching` fallbacks so an OEM-specific
+  API failure returns `false` instead of crashing the overlay.
+
+Verification note: local build could not run because this Windows environment has no `gradle` command
+on PATH and the repo intentionally has no checked-in wrapper; push/merge will rely on the existing
+GitHub Actions build, which generates Gradle 9.3.1.
+
+---
+
 ## 2026-07-03 — Session 10: STK verified working + lock-screen overhaul (5 fixes)
 
 **STK CONFIRMED WORKING.** Tested live with owner's key (read from local backend/.env) to 254727921038,

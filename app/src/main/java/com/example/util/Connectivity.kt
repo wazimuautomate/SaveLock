@@ -17,16 +17,18 @@ import android.telephony.TelephonyManager
 object Connectivity {
 
     /** True if the phone currently has validated internet (so an online M-Pesa payment can go through). */
-    fun hasInternet(context: Context): Boolean {
-        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
-        val net = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(net) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+    fun hasInternet(context: Context): Boolean = runCatching {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
+    }.getOrDefault(false)
 
     fun isWifiOn(context: Context): Boolean =
-        (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager)?.isWifiEnabled == true
+        runCatching {
+            (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager)
+                ?.isWifiEnabled == true
+        }.getOrDefault(false)
 
     fun isMobileDataOn(context: Context): Boolean = try {
         val tm = context.getSystemService(TelephonyManager::class.java)
