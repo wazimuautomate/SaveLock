@@ -73,8 +73,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             }
         }
         // Safety net: if the overlay ever gets removed while it should be up (OEM kill, race), re-add
-        // it. During payment this keeps the overlay attached in invisible/tap-through prompt mode, so
-        // the M-Pesa PIN surface stays usable.
+        // it. During payment this keeps the overlay attached in dimmed/tap-through prompt mode, so
+        // the M-Pesa PIN surface stays usable while the lock page remains visible.
         if (reassertTicker == null) {
             reassertTicker = ServiceLocator.appScope.launch {
                 while (true) {

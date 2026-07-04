@@ -5,8 +5,8 @@ package com.example.service
  * sanctioned system surface — WITHOUT lifting the lock or opening a general escape hatch:
  *
  *  - [paymentInProgress]: an STK payment is running, so the M-Pesa PIN dialog must be usable. The
- *    overlay stays VISIBLE (the phone still looks locked) but becomes non-focusable and stops
- *    re-asserting, so the PIN prompt shows on top of it. No other app becomes reachable.
+ *    overlay stays visible as a dimmed lock page, but becomes temporarily tap-through for the STK
+ *    startup window or recognized M-Pesa/STK payment surfaces.
  *  - [allowSettingsUntil]: the user tapped "turn on WiFi/data", so the Settings quick-panel is allowed
  *    for a short window. Only the Settings app is permitted during it — every other app still locks.
  */
@@ -26,7 +26,7 @@ object LockInteraction {
 
     fun setPaymentInProgress(active: Boolean) {
         paymentInProgress = active
-        paymentPromptUntil = if (active) System.currentTimeMillis() + PAYMENT_PROMPT_GRACE_MS else 0L
+        paymentPromptUntil = if (active) System.currentTimeMillis() + PAYMENT_PROMPT_STARTUP_MS else 0L
     }
 
     fun shouldHoldPaymentPrompt(currentForeground: String): Boolean =
@@ -92,5 +92,5 @@ object LockInteraction {
         "com.sec.android.app.stk",
     )
 
-    private const val PAYMENT_PROMPT_GRACE_MS = 90_000L
+    private const val PAYMENT_PROMPT_STARTUP_MS = 15_000L
 }
