@@ -84,8 +84,8 @@ fun LockScreenContent(
     }
 
     // While the STK PIN is being requested, let the M-Pesa PIN dialog show and receive touches. The
-    // overlay stays attached but becomes invisible/tap-through, then restores as soon as payment
-    // leaves the in-progress state.
+    // overlay stays attached as a dimmed lock page, then restores as soon as payment leaves the
+    // in-progress state.
     LaunchedEffect(dash.paymentStatus) {
         val inProgress = dash.paymentStatus == PaymentStatus.Requesting ||
             dash.paymentStatus == PaymentStatus.WaitingForSTK

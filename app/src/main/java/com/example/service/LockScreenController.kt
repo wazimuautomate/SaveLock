@@ -77,8 +77,8 @@ object LockScreenController {
     /**
      * During an STK payment the M-Pesa PIN prompt is a system/telephony surface below application
      * overlays on some phones. Focus changes alone are not enough: the lock can still visually cover
-     * the prompt. Keep the overlay attached so payment state keeps flowing, but make it invisible and
-     * tap-through until the payment leaves the in-progress state.
+     * the prompt. Keep the overlay attached and visible as a dimmed lock page, but make it tap-through
+     * until the payment leaves the in-progress state.
      */
     fun setPaymentPromptMode(context: Context, enabled: Boolean) {
         main.post {
@@ -92,7 +92,7 @@ object LockScreenController {
             } else {
                 lp.flags and promptFlags.inv()
             }
-            lp.alpha = if (enabled) 0f else 1f
+            lp.alpha = if (enabled) PAYMENT_PROMPT_LOCK_ALPHA else 1f
             runCatching { wm.updateViewLayout(v, lp) }
             if (!enabled) runCatching { v.requestFocus() }
         }
@@ -184,4 +184,6 @@ object LockScreenController {
             store.clear()
         }
     }
+
+    private const val PAYMENT_PROMPT_LOCK_ALPHA = 0.40f
 }

@@ -557,3 +557,14 @@ copy; app-picker for distraction apps (currently a fixed default list the user t
   keeps the prompt mode only for that window or recognized payment surfaces, then restores the lock.
 - Files changed: `LockScreenController.kt`, `LockScreenContent.kt`, `LockInteraction.kt`,
   `AppBlockerAccessibilityService.kt`, `CHANGELOG.md`, `memory.md`.
+
+## Session 2026-07-04 — STK prompt keeps lock page visible
+- Correction: the previous STK prompt fix made the overlay fully transparent (`alpha 0`), which let
+  the owner see and reach other apps during the payment wait. The desired behavior is that SaveLock's
+  lock page remains visible while the M-Pesa PIN prompt can sit over it.
+- Fix update: `LockScreenController.setPaymentPromptMode()` now keeps the overlay at `alpha 0.40`
+  plus `FLAG_NOT_FOCUSABLE` / `FLAG_NOT_TOUCHABLE`, so the lock page is still visible as a dimmed
+  layer while the STK prompt is visible and tappable.
+- Guard update: `LockInteraction` reduced the broad payment startup window from 90 seconds to 15
+  seconds. After startup, prompt mode is only held for blank foreground or recognized M-Pesa/STK/system
+  payment packages, so normal app foreground changes restore the lock faster.
