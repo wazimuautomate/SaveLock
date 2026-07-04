@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import android.view.inputmethod.InputMethodManager
 import com.example.data.local.entity.LockMode
 import com.example.di.ServiceLocator
 import kotlinx.coroutines.Job
@@ -32,6 +33,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private var chosenModeNeverBlocked: Set<String> = emptySet()
     // Full-lockdown allow-list: SaveLock + keyboard + SIM Toolkit + Messages + Dialer. Nothing else.
     private var lockdownAllowed: Set<String> = emptySet()
+    private var keyboardPackages: Set<String> = emptySet()
     // The Settings app(s) — allowed only briefly while the user turns WiFi/data on from the lock screen.
     private var settingsPackages: Set<String> = setOf("com.android.settings")
     private var currentForeground: String = ""
@@ -42,7 +44,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> reassert()
+                Intent.ACTION_SCREEN_ON -> reassert(forceLock = false)
+                Intent.ACTION_USER_PRESENT -> reassert(forceLock = true)
             }
         }
     }
@@ -76,6 +79,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             reassertTicker = ServiceLocator.appScope.launch {
                 while (true) {
                     delay(1200)
+                    refreshAllowLists()
                     if (!LockInteraction.paymentInProgress && shouldShowNow()) {
                         LockScreenController.show(this@AppBlockerAccessibilityService)
                     }
@@ -90,6 +94,15 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString().orEmpty()
         // Ignore our own overlay/app so its appearance doesn't count as "the user left the blocked app".
         if (pkg == packageName) return
+
+        // IME packages are not foreground apps. Let them type over SaveLock or over the M-Pesa PIN
+        // surface without changing the app we are judging underneath.
+        if (pkg in keyboardPackages) return
+
+        // Samsung often emits SystemUI while launching an allowed shortcut from our overlay. Ignore
+        // that short transition only when SaveLock itself granted an exact allowed-app launch.
+        if (pkg == SYSTEM_UI && LockInteraction.allowedLaunchActiveNow()) return
+
         if (pkg.isNotBlank()) currentForeground = pkg
         updateOverlay()
     }
@@ -113,7 +126,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             // the Settings app briefly while enabling WiFi/data). EVERY other app — and the launcher /
             // recents / an empty foreground — is covered. This is what makes Messages un-abusable: the
             // instant any non-allowed app comes forward, this returns true and the overlay slams back.
-            LockMode.FULL_LOCKDOWN -> currentForeground !in effectiveLockdownAllowed()
+            LockMode.FULL_LOCKDOWN ->
+                currentForeground !in effectiveLockdownAllowed() &&
+                    !LockInteraction.packageLaunchAllowedNow(currentForeground)
             // Chosen apps: cover only while one of the user's picked apps is in front.
             LockMode.CHOSEN_APPS -> currentForeground.isNotEmpty() &&
                 currentForeground !in chosenModeNeverBlocked &&
@@ -131,21 +146,31 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     /** Like [updateOverlay] but forces a fresh window on top (used after screen-on / unlock). */
-    private fun reassert() {
+    private fun reassert(forceLock: Boolean) {
         // Never re-add during payment — a fresh window would cover the M-Pesa PIN dialog.
         if (LockInteraction.paymentInProgress) return
         refreshAllowLists() // pick up any change to the default SMS/Dialer app since connect
+        if (forceLock && ServiceLocator.lockStateManager.isLockActiveNow()) {
+            // Critical Samsung A05 path: user opens Settings from the phone lock screen, enters the
+            // pattern, and Android lands straight in Settings. After USER_PRESENT, force SaveLock on
+            // top before trusting any stale allowed/keyboard foreground package.
+            currentForeground = ""
+            LockInteraction.clearAllowedLaunch()
+            LockScreenController.forceReshow(this)
+            return
+        }
         if (shouldShowNow()) LockScreenController.forceReshow(this) else LockScreenController.hide(this)
     }
 
     /** (Re)compute the emergency + full-lockdown allow-lists. Cheap; called on connect and each tick. */
     private fun refreshAllowLists() {
+        keyboardPackages = buildKeyboardPackages()
         chosenModeNeverBlocked = buildChosenModeNeverBlocked()
         // Full lockdown permits ONLY SaveLock infrastructure, the keyboard, SIM Toolkit (offline USSD
         // paying), the Messages app (to read the M-Pesa code), and the Dialer (to dial *334# / calls).
         // Do not include com.android.systemui here: on Samsung A05 the notification shade reports as
         // SystemUI, and treating it as allowed lets the overlay disappear when the shade is pulled.
-        lockdownAllowed = buildFullLockdownAllowed() + buildAllowedAppPackages()
+        lockdownAllowed = buildFullLockdownAllowed() + keyboardPackages + buildAllowedAppPackages()
     }
 
     /**
@@ -175,7 +200,33 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     /** The three apps a locked user may open: SIM Toolkit, the default Messages app, the Dialer. */
     private fun buildAllowedAppPackages(): Set<String> = AllowedApps.packages(this)
 
+    /** Current + common keyboard packages. They must never be treated as blocked foreground apps. */
+    private fun buildKeyboardPackages(): Set<String> {
+        val allowed = mutableSetOf(
+            "com.samsung.android.honeyboard",
+            "com.google.android.inputmethod.latin",
+            "com.android.inputmethod.latin",
+            "com.swiftkey.swiftkeyconfigurator",
+            "com.touchtype.swiftkey",
+        )
+        runCatching {
+            Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+                ?.substringBefore('/')
+                ?.takeIf { it.isNotBlank() }
+                ?.let { allowed.add(it) }
+        }
+        runCatching {
+            getSystemService(InputMethodManager::class.java)
+                ?.enabledInputMethodList
+                ?.mapNotNull { it.packageName.takeIf { pkg -> pkg.isNotBlank() } }
+                ?.let { allowed.addAll(it) }
+        }
+        return allowed
+    }
+
     private companion object {
+        const val SYSTEM_UI = "com.android.systemui"
+
         val WATCHED_EVENT_TYPES = setOf(
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOWS_CHANGED,

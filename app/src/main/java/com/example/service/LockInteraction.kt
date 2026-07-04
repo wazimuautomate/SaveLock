@@ -16,10 +16,36 @@ object LockInteraction {
 
     @Volatile var allowSettingsUntil: Long = 0L
 
+    @Volatile private var allowedLaunchPackage: String = ""
+    @Volatile private var allowedLaunchUntil: Long = 0L
+
     fun settingsAllowedNow(): Boolean = System.currentTimeMillis() < allowSettingsUntil
 
     /** Permit the Settings app (only) for [seconds] so the WiFi / internet panel can be used. */
     fun grantSettings(seconds: Int = 60) {
         allowSettingsUntil = System.currentTimeMillis() + seconds * 1000L
+    }
+
+    /**
+     * Permit the exact whitelisted package that the lock screen is launching. This avoids Samsung's
+     * transient SystemUI/launcher events from slamming the overlay back before Messages, Phone or SIM
+     * Toolkit reaches the foreground. It is intentionally package-specific and short-lived.
+     */
+    fun grantAllowedLaunch(packageName: String, seconds: Int = 8) {
+        allowedLaunchPackage = packageName
+        allowedLaunchUntil = System.currentTimeMillis() + seconds * 1000L
+    }
+
+    fun allowedLaunchActiveNow(): Boolean =
+        allowedLaunchPackage.isNotBlank() && System.currentTimeMillis() < allowedLaunchUntil
+
+    fun packageLaunchAllowedNow(packageName: String): Boolean =
+        packageName.isNotBlank() &&
+            packageName == allowedLaunchPackage &&
+            System.currentTimeMillis() < allowedLaunchUntil
+
+    fun clearAllowedLaunch() {
+        allowedLaunchPackage = ""
+        allowedLaunchUntil = 0L
     }
 }

@@ -6,6 +6,22 @@ This project uses date-based entries (personal, non-versioned build).
 
 ## [Unreleased]
 
+### Fixed (whitelisted apps and keyboard)
+- **Keyboard/IME packages are no longer treated as blocked foreground apps.** SaveLock ignores the
+  active keyboard package so recovery-code entry, M-Pesa number entry, and M-Pesa PIN entry are not
+  covered by a fresh overlay reassert.
+- **Messages, SIM Toolkit and Phone/Dialer get a short exact-package launch window** when opened from
+  the lock screen. This prevents Samsung SystemUI/launcher transition events from immediately
+  re-covering those allowed apps, while any app opened from inside them is still blocked immediately.
+- **Allowed-app detection is broader on Samsung/low-end Android phones.** SaveLock now includes common
+  Samsung/Google/AOSP Messages and Dialer packages plus more SIM Toolkit package candidates and a
+  launcher-label scan for SIM Toolkit.
+- **Unlocking the phone now forces the lock overlay back on top.** This closes the Samsung A05 path
+  where Settings was opened from the phone lock screen before drawing the pattern and then stayed open
+  after unlock.
+- **Start Locking now requires uninstall protection first.** If Device Admin is not active, tapping
+  Start Locking opens the uninstall-protection prompt instead of starting a weak lock.
+
 ### Changed (Samsung A05 lock hardening)
 - **Locking now starts only when you tap "Start locking now".** Creating a Savings plan or Goal saves
   it, but does not automatically arm the lock. Starting the lock also switches enforcement to Full

@@ -334,7 +334,10 @@ private fun MainPanel(
                         AllowedApps.Kind.DIALER -> Icons.Default.Call
                     }
                     AllowedAppIcon(entry.label, icon) {
-                        entry.launch?.let { runCatching { context.startActivity(it) } }
+                        entry.launch?.let {
+                            LockInteraction.grantAllowedLaunch(entry.packageName)
+                            runCatching { context.startActivity(it) }
+                        }
                     }
                 }
             }

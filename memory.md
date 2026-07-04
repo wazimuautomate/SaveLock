@@ -11,6 +11,38 @@ For the rules, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 2026-07-04 — Session 13: Fix over-aggressive whitelist/keyboard blocking
+
+Owner confirmed the manual lock now works on Samsung A05, but Full Lockdown was too aggressive:
+keyboard events caused re-locking during recovery/payment input; SIM Toolkit, Messages and Phone
+opened then were immediately covered; and a lock-screen notification-shade path could land in Settings
+after drawing the pattern.
+
+Fix:
+- `AppBlockerAccessibilityService` now tracks keyboard/IME packages separately and ignores them as
+  foreground apps. It uses the current default input method, enabled input methods, and common Samsung/
+  Google/AOSP keyboard package names. Keyboard use no longer changes the app being judged underneath.
+- Added `LockInteraction.grantAllowedLaunch(packageName)` for the exact whitelisted app launched from
+  the lock screen. During that short package-specific window, Samsung SystemUI transition events are
+  ignored so the allowed app can actually come forward.
+- Expanded `AllowedApps` detection: extra SIM Toolkit candidates, installed common Messages/Dialer
+  packages, Samsung/Google/AOSP dialer/messaging packages, and a launcher-label/package scan for SIM
+  Toolkit.
+- On `ACTION_USER_PRESENT`, the accessibility service now clears any transient allowed-launch state,
+  resets the foreground package, and force-reshows the lock overlay when the lock is active. This
+  targets the bypass where Settings is opened from the phone lock screen, then the user enters the
+  pattern and lands in Settings.
+- `DashboardViewModel.startLocking()` now requires Device Admin/uninstall protection first. If not
+  active, it opens the Device Admin prompt and tells the user to tap Start Locking again afterward.
+
+Android boundary to remember:
+- A normal sideloaded app cannot fully own the pre-unlock keyguard/notification-shade layer like a
+  device-owner/kiosk app. SaveLock can force itself immediately after unlock and block Settings from
+  there; true pre-unlock shade removal is an Android/OEM policy area. Safe Mode/factory reset remain
+  the intentional escape paths.
+
+---
+
 ## 2026-07-04 — Session 12: Samsung A05 lock hardening + manual Start Locking
 
 Owner moved testing from Samsung A06 to Samsung A05 and reported the lock overlay was unstable:
